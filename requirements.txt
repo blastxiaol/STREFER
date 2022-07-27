@@ -1,0 +1,8 @@
+opencv-python
+plyfile
+pytorch-transformers==1.2.0
+scipy
+tensorboardX
+tqdm
+trimesh
+shapely==1.8.2
