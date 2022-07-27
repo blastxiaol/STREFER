@@ -20,4 +20,6 @@ cd ../..
 
 # Install Detector
 ```
+pip install mmcv-full==1.6.0 -f https://download.openmmlab.com/mmcv/dist/cu113/torch1.11.0/index.html
+pip install mmdet==2.24.0
 ```
