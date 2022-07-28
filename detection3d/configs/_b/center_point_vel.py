@@ -111,8 +111,9 @@ data = dict(
         data_root='/remote-home/share/SHTperson/',
         ann_file=
         # '/remote-home/share/SHTperson/save_info/sht_infos_train19.pkl',
-        '/remote-home/share/SHTperson/save_info/sht_infos_val_2345678.pkl',
+        # '/remote-home/share/SHTperson/save_info/sht_infos_val_2345678.pkl',
         # "/remote-home/share/SHTperson/save_info/sht_infos_test_2345678.pkl",
+        '/remote-home/linzhx/Projects/strefer/data/strefer_det_info.pkl',
         pipeline=[
             dict(
                 type='LoadPointsFromMultiFrame',
@@ -233,14 +234,14 @@ model = dict(
             post_max_size=100,
             nms_thr=0.2)))
 checkpoint_config = dict(interval=1)
-evaluation = dict(interval=3)
+evaluation = dict(interval=5)
 log_config = dict(
     interval=50,
     hooks=[dict(type='TextLoggerHook'),
            dict(type='TensorboardLoggerHook')])
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = '../tracking_models/1-21-seg-bb'
+work_dir = "work_dir" #'../tracking_models/1-21-seg-bb'
 # load_from = '../painting_models/voxel_train19_seg_feature_75epoch.pth'
 resume_from = None
 workflow = [('train', 1)]

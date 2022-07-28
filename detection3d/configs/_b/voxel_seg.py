@@ -1,5 +1,5 @@
 _base_ = [
-    './data_seg_feature.py',
+    './center_point_vel.py',
     './bb-voxel.py'
 ]
 point_cloud_range=[0, -20.48, -4, 30.72, 20.48, 1]

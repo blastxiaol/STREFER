@@ -683,3 +683,65 @@ class LoadAnnotations3D(LoadAnnotations):
         repr_str += f'{indent_str}with_bbox_depth={self.with_bbox_depth}, '
         repr_str += f'{indent_str}poly2mask={self.poly2mask})'
         return repr_str
+
+@PIPELINES.register_module()
+class LoadPointsFromMultiFrame(object):
+    def __init__(self,
+                 coord_type,
+                 load_dim=4,
+                 type_ = 'prev',
+                 use_dim=[0, 1, 2, 3],
+                 remove_close=False,
+                 file_client_args=dict(backend='disk'),
+                 test_mode=False):
+        assert coord_type in ['CAMERA', 'LIDAR', 'DEPTH']
+        self.coord_type = coord_type
+        self.load_dim = load_dim
+        self.use_dim = use_dim
+        self.type = type_
+        self.file_client = None
+        self.file_client_args = file_client_args.copy()
+        self.remove_close = remove_close
+        self.test_mode = test_mode
+
+    def _load_points(self, pts_filename):
+        """Private function to load point clouds data.
+
+        Args:
+            pts_filename (str): Filename of point clouds data.
+
+        Returns:
+            np.ndarray: An array containing point clouds data.
+        """
+        if self.file_client is None:
+            self.file_client = mmcv.FileClient(**self.file_client_args)
+        try:
+            pts_bytes = self.file_client.get(pts_filename)
+            points = np.frombuffer(pts_bytes, dtype=np.float32)
+        except ConnectionError:
+            points = np.zeros(1,4)
+        return points
+        
+    def __call__(self, results):
+        pts_filename = results['pts_filename']
+        points = self._load_points(pts_filename)
+        points = points.reshape(-1, self.load_dim)
+        points = np.copy(points).reshape(-1, self.load_dim)
+        points[:, 3] = 0
+
+        pts_prev_filename = results['pts_prev_filename']
+        points_prev = self._load_points(pts_prev_filename)
+        points_prev = np.copy(points_prev).reshape(-1, self.load_dim)
+        points_prev[:, 3] = 1
+
+        points = np.concatenate([points,points_prev])
+        results['points'] = points
+        points_class = get_points_type(self.coord_type)
+        points = points_class(
+            points, points_dim=points.shape[-1], attribute_dims=None)
+        results['points'] = points
+        return results
+
+    def __repr__(self):
+        """str: Return a string that describes the module."""
+        return f'{self.__class__.__name__}(sweeps_num={self.sweeps_num})'

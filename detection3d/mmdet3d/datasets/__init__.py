@@ -29,6 +29,8 @@ from .sunrgbd_dataset import SUNRGBDDataset
 from .utils import get_loading_pipeline
 from .waymo_dataset import WaymoDataset
 
+from .sht_dataset import SHtechDataset
+
 __all__ = [
     'KittiDataset', 'KittiMonoDataset', 'build_dataloader', 'DATASETS',
     'build_dataset', 'NuScenesDataset', 'NuScenesMonoDataset', 'LyftDataset',
@@ -43,5 +45,5 @@ __all__ = [
     'VoxelBasedPointSampler', 'get_loading_pipeline', 'RandomDropPointsColor',
     'RandomJitterPoints', 'ObjectNameFilter', 'AffineResize',
     'RandomShiftScale', 'LoadPointsFromDict', 'PIPELINES',
-    'RangeLimitedRandomCrop', 'RandomRotate', 'MultiViewWrapper'
+    'RangeLimitedRandomCrop', 'RandomRotate', 'MultiViewWrapper', 'SHtechDataset'
 ]

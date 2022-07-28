@@ -11,9 +11,11 @@ from .pgd_bbox_coder import PGDBBoxCoder
 from .point_xyzwhlr_bbox_coder import PointXYZWHLRBBoxCoder
 from .smoke_bbox_coder import SMOKECoder
 
+from .own_centerpoint_bbox_coder import OwnCenterPointBBoxCoder
+
 __all__ = [
     'build_bbox_coder', 'DeltaXYZWLHRBBoxCoder', 'PartialBinBasedBBoxCoder',
     'CenterPointBBoxCoder', 'AnchorFreeBBoxCoder', 'GroupFree3DBBoxCoder',
     'PointXYZWHLRBBoxCoder', 'FCOS3DBBoxCoder', 'PGDBBoxCoder', 'SMOKECoder',
-    'MonoFlexCoder'
+    'MonoFlexCoder', 'OwnCenterPointBBoxCoder'
 ]
