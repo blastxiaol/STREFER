@@ -90,20 +90,32 @@ class PointcloudImageFusion(nn.Module):
         visual_feature = self.linear(visual_feature)
         return visual_feature
 
-class ViLBert3D(nn.Module):
+class ViLBert3DMF(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.point_cloud_extractor = PointCloudExtactor(args)
         self.image_extractor = ImageExtractor(args)
         self.fusion = PointcloudImageFusion(args, self.image_extractor.output_dim)
+        factor = 1
+        if args.cat_spatial:
+            factor = 2
         spatial_dim = 8
         if args.use_view:
             spatial_dim = 7
         if args.use_vel:
             spatial_dim = 9
+        spatial_dim = spatial_dim * factor
         self.matching = ViLBert(spatial_dim, args.vilbert_config_path, args.vil_pretrained_file)
     
-    def forward(self, image, boxes2d, points, spatial, vis_mask, token, mask, segment_ids, **kwargs):
+    def forward(self, image, boxes2d, points, spatial, vis_mask, 
+                    prev_image, prev_boxes2d, prev_points, prev_spatial, prev_vis_mask, 
+                    token, mask, segment_ids, rel_dist_mask, **kwargs):
+        print(image.shape, boxes2d.shape, points.shape, spatial.shape, vis_mask.shape)
+        print(prev_image.shape, prev_boxes2d.shape, prev_points.shape, prev_spatial.shape, prev_vis_mask.shape)
+        print(token.shape, mask.shape, segment_ids.shape)
+        print(rel_dist_mask.shape)
+        exit()
+
         # extract point cloud feature
         point_cloud_feature = self.point_cloud_extractor(points)
 

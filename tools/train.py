@@ -24,14 +24,15 @@ def get_args_parser():
     parser = argparse.ArgumentParser('Set config')
     parser.add_argument('--dataset', default='strefer', type=str, help='dataset')
     parser.add_argument('--data_path', default='/remote-home/share/SHTperson', type=str, help='point cloud path')
-    # parser.add_argument('--max_seq_len', default=50, type=int)
     parser.add_argument('--sample_points_num', default=500, type=int, help='number of sampling points')
     parser.add_argument('--img_shape', default=(1280, 720), type=tuple, help='image shape')
     parser.add_argument('--bert_model', default='bert-base-uncased', type=str, help='bert model')
     parser.add_argument('--use_view', action='store_true')
     parser.add_argument('--use_vel', action='store_true')
     parser.add_argument('--no_rgb', action='store_true', help="Not use pointpainting feature")
+    parser.add_argument('--multi_frame', action='store_true')
     parser.add_argument('--threshold', default=0.25, type=float, help='target threshold')
+    parser.add_argument('--rel_dist_threshold', default=1.0, type=float, help='relative distance threshold for multi-objects association')
 
     parser.add_argument('--batch_size', default=16, type=int)
     parser.add_argument('--num_workers', default=8, type=int)
@@ -47,7 +48,8 @@ def get_args_parser():
     parser.add_argument('--vis_out_dim', default=2048, type=int, help="visual information (point cloud and image) output feature dimension")
     parser.add_argument('--vilbert_config_path', default='configs/bert_base_6layer_6conect.json', type=str, help="ViLBert config file path")
     parser.add_argument('--vil_pretrained_file', default='pretrained_model/multi_task_model.bin', type=str, help="ViLBert pretrained file path")
-    
+    parser.add_argument('--cat_spatial', action='store_true')
+
     parser.add_argument('--no_evaluate', action='store_true', help="If true, evaluate when training")
     parser.add_argument('--epoch', default=80, type=int)
     parser.add_argument('--lr', default=1e-4, type=float)
@@ -61,8 +63,8 @@ def get_args_parser():
     args = parser.parse_args()
     if args.debug:
         args.work_dir = "debug"
-    #     args.num_workers = 0
-    #     args.batch_size = 1
+        args.num_workers = 0
+        args.batch_size = 2
     return args
 
 
@@ -70,21 +72,16 @@ def train_epoch(epoch: int, dataloader, model,\
                  criterion, optimizer, scheduler, total_epoch: int, logger=None):
     model.train()
     mean_loss = 0
-    for idx, (image, boxes2d, points, spatial, vis_mask, token, mask, segment_ids, target) in enumerate(dataloader):
+    for idx, data in enumerate(dataloader):
         start_time = time()
-        image = image.cuda()
-        boxes2d = boxes2d.cuda()
-        points = points.cuda()
-        spatial = spatial.cuda()
-        vis_mask = vis_mask.cuda()
-        token = token.cuda()
-        mask = mask.cuda()
-        segment_ids = segment_ids.cuda()
-        target = target.cuda()
-
-        scores = model(image, boxes2d, points, spatial, vis_mask, token, mask, segment_ids)   
+        for key in data:
+            try:
+                data[key] = data[key].cuda()
+            except:
+                pass
+        scores = model(**data)   
         optimizer.zero_grad()
-        loss = criterion(scores, target)
+        loss = criterion(scores, data['target'])
         mean_loss += loss.item() / len(dataloader)
         loss.backward()
         optimizer.step()
@@ -98,7 +95,7 @@ def train_epoch(epoch: int, dataloader, model,\
             hour = int(eta % (24 * 3600) // 3600)
             day = int(eta // (24 * 3600))
 
-            info = f"TRN Epoch[{epoch}][{idx}|{len(dataloader)}]\tloss={round(loss.item(), 4)}\t"\
+            info = f"TRN Epoch[{epoch+1}][{idx}|{len(dataloader)}]\tloss={round(loss.item(), 4)}\t"\
                    f"lr={optimizer.param_groups[0]['lr']}\tbert_lr={optimizer.param_groups[3]['lr']}\t"\
                    f"ETA: {day} days {hour} hours {minute} mins {sec} secs"
             print(info)
@@ -111,19 +108,15 @@ def validate(dataset, dataloader, model, criterion=None):
     model.eval()
     loss = 0
     max_index = []
-    for image, boxes2d, points, spatial, vis_mask, token, mask, segment_ids, target in tqdm(dataloader):
-        image = image.cuda()
-        boxes2d = boxes2d.cuda()
-        points = points.cuda()
-        spatial = spatial.cuda()
-        vis_mask = vis_mask.cuda()
-        token = token.cuda()
-        mask = mask.cuda()
-        segment_ids = segment_ids.cuda()
-        target = target.cuda()
-        logits = model(image, boxes2d, points, spatial, vis_mask, token, mask, segment_ids)
+    for data in tqdm(dataloader):
+        for key in data:
+            try:
+                data[key] = data[key].cuda()
+            except:
+                pass
+        logits = model(**data)
         if criterion:
-            each_loss = criterion(logits, target)
+            each_loss = criterion(logits, data['target'])
             loss += each_loss.item()
         index = torch.flatten(torch.topk(logits, 1).indices).cpu().detach().numpy()
         max_index.append(index)
@@ -147,7 +140,7 @@ def train(args, train_dataset, val_dataset, model, criterion, optimizer, schedul
         if not args.no_evaluate and ((ep+1) % args.val_epoch == 0):
             for i, val_loader in enumerate(val_dataloader_list):
                 acc25, acc50, m_iou, loss = validate(val_dataset[i], val_loader, model, criterion=criterion)
-                info = f"{val_name[i]} Epoch[{ep}]\tacc25={acc25}\tacc50={acc50}\tm_iou={m_iou}\tloss={loss}"
+                info = f"{val_name[i]} Epoch[{ep+1}]\tacc25={acc25}\tacc50={acc50}\tm_iou={m_iou}\tloss={loss}"
                 print(info)
                 logger(info)
 

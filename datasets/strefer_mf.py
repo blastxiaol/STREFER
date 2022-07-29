@@ -43,6 +43,7 @@ class STREFER_MF(Dataset):
         self.volume = self.lmax * self.wmax * self.hmax
 
         self.target_threshold = args.threshold
+        self.rel_threshold = args.rel_dist_threshold
 
         self.spatial_dim = 8
         if args.use_view:
@@ -96,10 +97,12 @@ class STREFER_MF(Dataset):
         boxes3d = np.load(f"data/pred_bboxes/{group_id}/{scene_id}/{point_cloud_name[:-4]}.npy")
         objects_pc = strefer_utils.batch_extract_pc_in_box3d(points, boxes3d, self.sample_points_num, self.dim)
         corners2d = strefer_utils.batch_compute_box_3d(boxes3d)
+        object_center = boxes3d[:, :3]
 
         prev_boxes3d = np.load(f"data/pred_bboxes/{group_id}/{scene_id}/{prev_point_cloud_name[:-4]}.npy")
         prev_objects_pc = strefer_utils.batch_extract_pc_in_box3d(prev_points, prev_boxes3d, self.sample_points_num, self.dim)
         prev_corners2d = strefer_utils.batch_compute_box_3d(prev_boxes3d)
+        prev_object_center = prev_boxes3d[:, :3]
 
         spatial = []
         prev_spatial = []
@@ -230,7 +233,18 @@ class STREFER_MF(Dataset):
         sentence = language_info['description'].lower()
         sentence = "[CLS] " + sentence + " [SEP]"
         token = self.tokenizer.encode(sentence)
-        return image, boxes2d, objects_pc, spatial, token, target, prev_image, prev_boxes2d, prev_objects_pc, prev_spatial
+
+        # relative distance
+        rel_dist_mask = np.zeros((len(object_center), len(prev_object_center)), dtype=np.bool)
+        for i in range(rel_dist_mask.shape[0]):
+            obj_pos = object_center[i]
+            for j in range(rel_dist_mask.shape[1]):
+                prev_obj_pos = prev_object_center[j]
+                dist = np.sqrt(np.power(obj_pos - prev_obj_pos, 2).sum())
+                if dist < self.rel_threshold:
+                    rel_dist_mask[i, j] = 1
+
+        return image, boxes2d, objects_pc, spatial, token, target, prev_image, prev_boxes2d, prev_objects_pc, prev_spatial, rel_dist_mask
     
     def collate_fn(self, raw_batch):
         raw_batch = list(zip(*raw_batch))
@@ -316,14 +330,21 @@ class STREFER_MF(Dataset):
         for i, each_target in enumerate(target_list):
             target[i, :len(each_target)] = torch.tensor(each_target) 
         
-        ouput = dict(
+        # rel_dist_mask
+        rel_dist_mask_list = raw_batch[10]
+        rel_dist_mask = torch.zeros((len(boxes2d_list), max_obj_num, max_obj_num), dtype=torch.bool)
+        for i, each_dist_mask in enumerate(rel_dist_mask_list):
+            rel_dist_mask[i, :each_dist_mask.shape[0], :each_dist_mask.shape[1]] = torch.tensor(each_dist_mask)
+   
+        output = dict(
             image=image, boxes2d=boxes2d, points=points, spatial=spatial, vis_mask=vis_mask,
             prev_image=prev_image, prev_boxes2d=prev_boxes2d, prev_points=prev_points, prev_spatial=prev_spatial, prev_vis_mask=prev_vis_mask,
             token=token, mask=mask, segment_ids=segment_ids, 
+            rel_dist_mask=rel_dist_mask,
             target=target
         )      
 
-        return image, boxes2d, points, spatial, vis_mask, token, mask, segment_ids, target
+        return output
     
     def __len__(self):
         return len(self.dataset)
