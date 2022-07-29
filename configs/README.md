@@ -1,0 +1,1 @@
+Download bert_base_6layer_6conect.json [here](https://github.com/facebookresearch/vilbert-multi-task).

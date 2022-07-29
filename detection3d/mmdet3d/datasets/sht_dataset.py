@@ -243,7 +243,7 @@ class SHtechDataset(Custom3DDataset):
             list[dict]: List of annotations.
         """
         # loading data from a file-like object needs file format
-        return mmcv.load(ann_file, file_format='pkl')
+        return mmcv.load(ann_file, file_format='pkl')#[:10]
 
     # def get_data_info(self,index):
     #     info = self.data_infos[index]
@@ -433,7 +433,28 @@ class SHtechDataset(Custom3DDataset):
                 if not os.path.exists(scene_path):
                     os.makedirs(scene_path)
                 file_path = os.path.join(scene_path, f"{pts_name[:-4]}.npy")
-                np.save(file_path, pred_bboxes)
+
+                centers = pred_bboxes[:, :3].copy()
+                points = np.insert(centers, 3, values=1, axis=1)
+                points_T = np.transpose(points)
+                points_T[3, :] = 1.0
+                # lidar2camera
+                points_T_camera = np.dot(ex_matrix, points_T)
+                # camera2pixel
+                pixel = np.dot(in_matrix, points_T_camera).T
+                pixel_xy = np.array([x / x[2] for x in pixel])[:, 0:2]
+                pixel_xy = np.around(pixel_xy).astype(int)
+
+                filter_pred_bboxes = []
+                for k in range(pixel_xy.shape[0]):
+                    x, y = pixel_xy[k]
+                    if 0 <= x < 1280 and 0 <= y < 720:
+                        filter_pred_bboxes.append(pred_bboxes[k])
+                if len(filter_pred_bboxes) > 0:
+                    filter_pred_bboxes = np.vstack(filter_pred_bboxes)
+                else:
+                    filter_pred_bboxes = np.zeros((0, 9), dtype=np.float32)
+                np.save(file_path, filter_pred_bboxes)
             exit()
 
         detection_results = []
@@ -447,25 +468,7 @@ class SHtechDataset(Custom3DDataset):
 
             gt_bboxes = self.get_ann_info(i)['gt_bboxes_3d'].tensor.numpy()
             pred_bboxes = results[i]['pts_bbox']['boxes_3d'].tensor.numpy()
-
-            # print(gt_bboxes.shape, pred_bboxes.shape)
-            # pred_bboxes, index_list = filter_bbox(pred_bboxes)
-
             confidence = results[i]['pts_bbox']['scores_3d'].numpy()
-
-            # print("===========================================================================")
-            # print("all_gt_bboxes = ", gt_bboxes.tolist())
-            # print("all_pred_bboxes = ", pred_bboxes.tolist())
-            # print("pts_filename: ", gt_info['point_cloud']['point_cloud_path'])
-            # print()
-            # print()
-
-
-            # pred_bboxes = torch.from_numpy(pred_bboxes)
-            # dst = pred_bboxes.new_tensor((0.5, 0.5, -0.5))
-            # src = pred_bboxes.new_tensor((0, 0, 0))
-            # pred_bboxes[:, :3] -= pred_bboxes[:, 3:6] * (dst - src)
-            # pred_bboxes = pred_bboxes.numpy()
 
             data_info = dict(pts_filename=pts_filename, gt_bboxes=gt_bboxes, pred_bboxes=pred_bboxes, confidence=confidence)
             detection_results.append(data_info)

@@ -1,0 +1,1 @@
+python tools/train.py --use_view --work_dir work_dir/single_frame/view

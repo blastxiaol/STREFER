@@ -1,0 +1,22 @@
+# .gitignore
+
+*.bin
+*.pkl
+*.json
+*.ipynb
+**__pycache__**
+*.txt
+data/src
+work_dir
+
+# pointnet++
+external_tools/pointnet2/build
+external_tools/pointnet2/dist
+external_tools/pointnet2/pointnet2.egg-info
+
+# data
+data/pred_bboxes
+
+
+# debug
+debug
