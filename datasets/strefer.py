@@ -7,8 +7,6 @@ from utils import pc_utils, strefer_utils
 from utils.metrics import cal_accuracy
 from pytorch_transformers.tokenization_bert import BertTokenizer
 import cv2
-import scipy
-import random
 from tqdm import tqdm
 import math
 import cmath
