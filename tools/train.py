@@ -33,6 +33,7 @@ def get_args_parser():
     parser.add_argument('--multi_frame', action='store_true')
     parser.add_argument('--threshold', default=0.25, type=float, help='target threshold')
     parser.add_argument('--rel_dist_threshold', default=1.0, type=float, help='relative distance threshold for multi-objects association')
+    parser.add_argument('--matching_threshold', default=0.7, type=float, help='similarity matching threshold for multi-objects association')
 
     parser.add_argument('--batch_size', default=16, type=int)
     parser.add_argument('--num_workers', default=8, type=int)
@@ -63,8 +64,8 @@ def get_args_parser():
     args = parser.parse_args()
     if args.debug:
         args.work_dir = "debug"
-        args.num_workers = 0
-        args.batch_size = 2
+        # args.num_workers = 0
+        # args.batch_size = 2
     return args
 
 
@@ -127,6 +128,10 @@ def validate(dataset, dataloader, model, criterion=None):
 
 def train(args, train_dataset, val_dataset, model, criterion, optimizer, scheduler, epoch, logger=None):
     start = time()
+    best_score = {
+        'acc25': -1, 'acc50': -1, 'm_iou': -1
+    }
+    best_info = ""
     train_dataloader = DataLoader(train_dataset, args.batch_size, shuffle=True, 
                                     num_workers=args.num_workers, collate_fn=train_dataset.collate_fn)
     val_dataloader_list = [
@@ -143,6 +148,16 @@ def train(args, train_dataset, val_dataset, model, criterion, optimizer, schedul
                 info = f"{val_name[i]} Epoch[{ep+1}]\tacc25={acc25}\tacc50={acc50}\tm_iou={m_iou}\tloss={loss}"
                 print(info)
                 logger(info)
+                if i == 0 and acc25 > best_score['acc25']:
+                    logger.save_model(model, f"best_model.pth")
+                    best_score['acc25'] = acc25
+                    best_score['acc50'] = acc50
+                    best_score['m_iou'] = m_iou
+                    best_info = f"Best Epoch[{ep+1}]\tacc25={acc25}\tacc50={acc50}\tm_iou={m_iou}"
+                    print(best_info)
+                    logger(best_info)
+    print(best_info)
+    logger(best_info)
 
     used_time = time() - start
     sec = int(used_time % 60)

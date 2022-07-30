@@ -120,15 +120,13 @@ def loc_pc2img(points):
     
     return pixel_xy.T
 
-def get_frame_info(frame_name, id):
+def get_frame_info(frame_name, id, group_id, scene_id, frame_anno):
     data_dict = {}
     anno_info = frame_name.split('/')
     point_cloud_name = anno_info[7]
     anno_name = f"{anno_info[4]}-{anno_info[5]}.json"
-    group_id = anno_info[4].split()[0]
-    scene_id = anno_info[5]
     anno = ANNO_DICT_2D[anno_name]
-
+    
     frame_id = None
     bbox = None
     image_name = None
@@ -145,20 +143,24 @@ def get_frame_info(frame_name, id):
                     bbox = [item['position']['x'], item['position']['y'], item['position']['z'], 
                         item['boundingbox']['x'], item['boundingbox']['y'], item['boundingbox']['z'],
                         item['rotation']]
-            for image in frame['images']:
-                image_name = image['image_name'].split('/')[-1]
-                for image_item in image['items']:
-                    if id == image_item['id']:
-                        center_x, center_y = image_item['boundingbox']['x'], image_item['boundingbox']['y']
-                        weight, height = image_item['dimension']['x'], image_item['dimension']['y']
-                        image_bbox = [int(center_x), int(center_y), int(weight), int(height)]
-                        break
+        
+            image = frame['images'][0]
+            image_name = image['image_name'].split('/')[-1]
+            for image_item in image['items']:
+                if id == image_item['id']:
+                    center_x, center_y = image_item['boundingbox']['x'], image_item['boundingbox']['y']
+                    weight, height = image_item['dimension']['x'], image_item['dimension']['y']
+                    image_bbox = [int(center_x), int(center_y), int(weight), int(height)]
+                    break
             break
     if bbox is None:    # 前一帧 没有这个object
         return None
     assert frame_id is not None
     assert image_name is not None
 
+
+    if not os.path.exists(os.path.join("/remote-home/share/SHTperson", group_id, scene_id, 'left', image_name)):
+        return None
     try:
         assert image_bbox is not None
     except:
@@ -269,8 +271,8 @@ def trans_type(anno_file):
 
         prev_frame = frame_anno['previous']
         next_frame = frame_anno['next']
-        prev_info = get_frame_info(prev_frame, id_3d) if prev_frame else None
-        next_info = get_frame_info(next_frame, id_3d) if next_frame else None
+        prev_info = get_frame_info(prev_frame, id_3d, group_id, scene_id, frame_anno) if prev_frame else None
+        next_info = get_frame_info(next_frame, id_3d, group_id, scene_id, frame_anno) if next_frame else None
 
         if prev_info is None:
             # print("No previous frame")
@@ -411,6 +413,7 @@ if __name__ == '__main__':
     trans_type(all_anno)
     print(len(TRAIN_SET), len(TEST_SET))
     if check(TRAIN_SET, TEST_SET):
+        print("OKKKKK")
         with open("train_SHTpersonRefer_ann.json", 'w') as f:       # , encoding='UTF-8'
             f.write(json.dumps(TRAIN_SET, cls=NumpyEncoder))
         with open("test_SHTpersonRefer_ann.json", 'w') as f:        # , encoding='UTF-8'
