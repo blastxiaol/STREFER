@@ -57,7 +57,7 @@ d_{thr} \text{ is a hyper-paramenter meaning distance threshold which is set as 
 | Ours view-emb     |   42.03  |  39.59  | 32.34 | (25/55) |
 | Ours view-vel-emb |   41.74  |  39.31  | 32.09 | (15/51) |
 
-### Resnet34 & Pointnet++ (multi frame input) (Only use current position)
+### Resnet34 & Pointnet++ (multi frame input) (Use both current and previous position)
 |       Method      | Acc@0.25 | Acc@0.5 | mIOU  | (best Epoch / 目前训练了的Epoch数   总共80个Epoch) |
 |:-----------------:|:--------:|:-------:|:-----:|:-----:|
 | Ours pos-emb      |   42.96  |  40.15  | 32.95 | (25/27)
