@@ -23,14 +23,17 @@ $$ F_{v}^i(t) = \phi(F_{point}^i(t), F_{image}^i(t)) $$
 
 $$\text{where } F_{v}^i \text{ is the feature of i-th object, } \phi(\cdot) \text{ is concatenation. } \\
 t \text{ and }t-1 \text{ are current and previous frames.}$$
+
+<br>
 **Constrained Condition:**
+
+
 $$ j_{match}^i = argmax_{i}(\left\{
                 \begin{array}{ll}
-                  x ,\ \text{ if } D(P_{i}(t), P_{j}(t-1)) < d_{thr}\\
+                  SIM(F_{v}^i(t), F_{v}^j(t-1)) ,\ \text{ if } D(P_{i}(t), P_{j}(t-1)) < d_{thr} \\
                   -1 ,\ \text{ else}
                 \end{array}
-              \right.)
- $$
+              \right.) $$
 
 $$\text{where } j_{match}^{i} \text{ is the index of matched object in the previous frame for the i-th object in the current frame, } \\
 D(\cdot) \text{ is the distance of two points. } P \text{ is the center position of an object. } \\
@@ -60,6 +63,6 @@ d_{thr} \text{ is a hyper-paramenter meaning distance threshold which is set as 
 ### Resnet34 & Pointnet++ (multi frame input) (Use both current and previous position)
 |       Method      | Acc@0.25 | Acc@0.5 | mIOU  | (best Epoch / 目前训练了的Epoch数   总共80个Epoch) |
 |:-----------------:|:--------:|:-------:|:-----:|:-----:|
-| Ours pos-emb      |   42.96  |  40.15  | 32.95 | (25/27)
-| Ours view-emb     |   37.43  |  34.90  | 28.61 | (16/29)
-| Ours view-vel-emb |   41.74  |  39.12  | 32.13 | (15/28)
+| Ours pos-emb      |   42.96  |  40.15  | 32.95 | (25/32)
+| Ours view-emb     |   38.18  |  36.30  | 29.46 | (33/34)
+| Ours view-vel-emb |   42.40  |  39.59  | 32.43 | (29/32)
