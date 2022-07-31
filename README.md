@@ -25,8 +25,8 @@ $$\text{where } F_{v}^i \text{ is the feature of i-th object, } \phi(\cdot) \tex
 t \text{ and }t-1 \text{ are current and previous frames.}$$
 
 <br>
-**Constrained Condition:**
-
+Constrained Condition:
+<br>
 
 $$ j_{match}^i = argmax_{i}(\left\{
                 \begin{array}{ll}
@@ -64,5 +64,5 @@ d_{thr} \text{ is a hyper-paramenter meaning distance threshold which is set as 
 |       Method      | Acc@0.25 | Acc@0.5 | mIOU  | (best Epoch / 目前训练了的Epoch数   总共80个Epoch) |
 |:-----------------:|:--------:|:-------:|:-----:|:-----:|
 | Ours pos-emb      |   42.96  |  40.15  | 32.95 | (25/32)
-| Ours view-emb     |   38.18  |  36.30  | 29.46 | (33/34)
-| Ours view-vel-emb |   42.40  |  39.59  | 32.43 | (29/32)
+| Ours view-emb     |   39.12  |  37.34  | 30.27 | (39/44)
+| Ours view-vel-emb |   42.68  |  40.24  | 32.82 | (39/41)
