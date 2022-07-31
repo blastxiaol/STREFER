@@ -46,20 +46,20 @@ d_{thr} \text{ is a hyper-paramenter meaning distance threshold which is set as 
 ### Resnet34 & Pointnet++ (single frame input)
 |       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
 |:-----------------:|:--------:|:-------:|:-----:|
-| Ours pos-emb      |   42.40  |  39.77  | 32.73 |   (35|80)
-| Ours view-emb     |   44.93  |  42.03  | 34.53 |   (25|80)
-| Ours view-vel-emb |   43.34  |  40.43  | 33.04 |   (35|80)
+| Ours pos-emb      |   42.40  |  39.77  | 32.73 |   (35/80)
+| Ours view-emb     |   44.93  |  42.03  | 34.53 |   (25/80)
+| Ours view-vel-emb |   43.34  |  40.43  | 33.04 |   (35/80)
 
 ### Resnet34 & Pointnet++ (multi frame input) (Only use current position)
-|       Method      | Acc@0.25 | Acc@0.5 | mIOU  | (best Epoch | 目前训练了的Epoch数   总共80个Epoch)
-|:-----------------:|:--------:|:-------:|:-----:|
-| Ours pos-emb      |   42.21  |  40.43  | 33.00 | (27|55)
-| Ours view-emb     |   42.03  |  39.59  | 32.34 | (25|55)
-| Ours view-vel-emb |   41.74  |  39.31  | 32.09 | (15|51)
+|       Method      | Acc@0.25 | Acc@0.5 | mIOU  | (best Epoch / 目前训练了的Epoch数   总共80个Epoch) |
+|:-----------------:|:--------:|:-------:|:-----:|:-----:|
+| Ours pos-emb      |   42.21  |  40.43  | 33.00 | (27/55) |
+| Ours view-emb     |   42.03  |  39.59  | 32.34 | (25/55) |
+| Ours view-vel-emb |   41.74  |  39.31  | 32.09 | (15/51) |
 
 ### Resnet34 & Pointnet++ (multi frame input) (Only use current position)
-|       Method      | Acc@0.25 | Acc@0.5 | mIOU  | (best Epoch | 目前训练了的Epoch数   总共80个Epoch)
-|:-----------------:|:--------:|:-------:|:-----:|
-| Ours pos-emb      |   42.96  |  40.15  | 32.95 | (25|27)
-| Ours view-emb     |   37.43  |  34.90  | 28.61 | (16|29)
-| Ours view-vel-emb |   41.74  |  39.12  | 32.13 | (15|28)
+|       Method      | Acc@0.25 | Acc@0.5 | mIOU  | (best Epoch / 目前训练了的Epoch数   总共80个Epoch) |
+|:-----------------:|:--------:|:-------:|:-----:|:-----:|
+| Ours pos-emb      |   42.96  |  40.15  | 32.95 | (25/27)
+| Ours view-emb     |   37.43  |  34.90  | 28.61 | (16/29)
+| Ours view-vel-emb |   41.74  |  39.12  | 32.13 | (15/28)
