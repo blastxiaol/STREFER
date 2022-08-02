@@ -51,7 +51,7 @@ class STREFER_MFGT(Dataset):
         if args.use_vel:
             self.spatial_dim = 9
         
-        self.current2prev = pickle.load(open("data/current2prev.pkl", 'rb'))
+        self.current2prev = pickle.load(open("data/current2prev_gt.pkl", 'rb'))
 
     def __getitem__(self, index):
         data = self.dataset[index]

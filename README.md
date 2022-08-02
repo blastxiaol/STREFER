@@ -6,9 +6,9 @@
    
 2. 2. [ ] 用pointnet++的backbone重新进行单帧输入/多帧输入的实验。
    1. [x] ~~单帧输入三组实验（pos_emb, view-base, vel-base)~~
-   2. [x] 多帧输入三组实验 (但是效果不如单帧输入)
-   3. [ ] 匹配GT-pred-box
-   4. [ ] 多帧GT实验：点云融合，norm各自帧位置
+   2. [x] ~~多帧输入三组实验 (但是效果不如单帧输入)~~
+   3. [x] ~~匹配GT-pred-box~~
+   4. [x] ~~多帧GT实验：点云融合，norm各自帧位置~~
    5. [ ] 多帧GT实验：点云融合，norm当前帧位置
    6. [ ] 多帧GT实验：特征融合，norm各自帧位置
    7. [ ] 多帧GT实验：特征融合，norm当前帧位置
@@ -72,14 +72,14 @@ d_{thr} \text{ is a hyper-paramenter meaning distance threshold which is set as 
 | Ours view-emb     |   40.71  |  38.74  | 31.44 | (58/80)
 | Ours view-vel-emb |   43.15  |  40.53  | 33.32 | (65/80)
 
-# GT Multi frames (normalize to center)
+### GT Multi frames (normalize to center)
 |       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
 |:-----------------:|:--------:|:-------:|:-----:|
 | Ours pos-emb      |   43.34  |  40.53  | 33.33 | 
 | Ours view-emb     |   47.28  |  44.09  | 35.97 | 
 | Ours view-vel-emb |   44.56  |  41.46  | 34.25 | 
 
-# GT Multi frames (normalize to current frame's center)
+### GT Multi frames (normalize to current frame's center)
 |       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
 |:-----------------:|:--------:|:-------:|:-----:|
 | Ours pos-emb      |   x  |  x  |  x  | 
