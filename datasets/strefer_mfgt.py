@@ -44,14 +44,17 @@ class STREFER_MFGT(Dataset):
         self.volume = self.lmax * self.wmax * self.hmax
 
         self.target_threshold = args.threshold
+        self.relative_spatial = args.relative_spatial
 
         self.spatial_dim = 8
         if args.use_view:
             self.spatial_dim = 7
         if args.use_vel:
             self.spatial_dim = 9
-        
-        self.current2prev = pickle.load(open("data/current2prev_gt.pkl", 'rb'))
+        if args.use_gt:
+            self.current2prev = pickle.load(open("data/current2prev_gt.pkl", 'rb'))
+        else:
+            self.current2prev = pickle.load(open("data/current2prev.pkl", 'rb'))
 
     def __getitem__(self, index):
         data = self.dataset[index]
@@ -119,17 +122,15 @@ class STREFER_MFGT(Dataset):
                 prev_objects_pc[i] = objects_pc[i].copy()
             else:
                 prev_obj_pc_i = strefer_utils.batch_extract_pc_in_box3d(prev_points, [prev_box], self.sample_points_num, self.dim)[0]
-                # pmin = min_array[i]
-                # pmax = max_array[i]
-                # if pmin is None:
-                #     prev_obj_pc_i[:, :3] = np.zeros_like(prev_obj_pc_i[:, :3])
-                # else:
-                #     prev_obj_pc_i[:, :3] = strefer_utils.norm(prev_obj_pc_i[:, :3], pmin, pmax)
                 if not (prev_obj_pc_i[:, :3] == 0).all():
-                    pxmin, pymin, pzmin = prev_obj_pc_i[:, :3].min(axis=0)
-                    pxmax, pymax, pzmax = prev_obj_pc_i[:, :3].max(axis=0)
-                    pmin = np.array([pxmin, pymin, pzmin])
-                    pmax = np.array([pxmax, pymax, pzmax])
+                    if self.relative_spatial:
+                        pmin = min_array[i]
+                        pmax = max_array[i]
+                    else:
+                        pxmin, pymin, pzmin = prev_obj_pc_i[:, :3].min(axis=0)
+                        pxmax, pymax, pzmax = prev_obj_pc_i[:, :3].max(axis=0)
+                        pmin = np.array([pxmin, pymin, pzmin])
+                        pmax = np.array([pxmax, pymax, pzmax])
                     if (pmin == pmax).all():
                         prev_obj_pc_i[:, :3] = np.zeros_like(prev_obj_pc_i[:, :3])
                     else:

@@ -56,6 +56,8 @@ def get_args_parser():
     parser.add_argument('--lr', default=1e-4, type=float)
     parser.add_argument('--lr_bert', default=1e-5, type=float)
 
+    parser.add_argument('--use_gt', action='store_true', help="Use GT previous box (Test)")
+    parser.add_argument('--relative_spatial', action='store_true', help="Use current box to norm")
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--load_from', default='', type=str, help="ViLBert pretrained file path")
     parser.add_argument('--val_epoch', default=1, type=int)
