@@ -121,12 +121,12 @@ def validate(dataset, dataloader, model, criterion=None):
         logits = model(**data)
         if criterion:
             each_loss = criterion(logits, data['target'])
-            loss += each_loss.item()
+            loss += (each_loss * logits.shape[0]).item()
         index = torch.flatten(torch.topk(logits, 1).indices).cpu().detach().numpy()
         max_index.append(index)
     max_index = np.hstack(max_index)
     acc25, acc50, m_iou = dataset.evaluate(max_index)
-    loss = loss / len(dataloader)
+    loss = loss / len(dataset)
     return acc25, acc50, m_iou, loss
 
 def train(args, train_dataset, val_dataset, model, criterion, optimizer, scheduler, epoch, logger=None):

@@ -82,6 +82,20 @@ d_{thr} \text{ is a hyper-paramenter meaning distance threshold which is set as 
 ### GT Multi frames (normalize to current frame's center)
 |       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
 |:-----------------:|:--------:|:-------:|:-----:|
+| Ours pos-emb      |   43.25  |  40.81  |  33.29  | 
+| Ours view-emb     |   45.12  |  41.74  |  34.35  | 
+| Ours view-vel-emb |   x  |  x  |  x  | 
+
+### GT Multi frames feature fusion(normalize to center)
+|       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
+|:-----------------:|:--------:|:-------:|:-----:|
+| Ours pos-emb      |   x  |  x  |  x  | 
+| Ours view-emb     |   x  |  x  |  x  | 
+| Ours view-vel-emb |   x  |  x  |  x  | 
+
+### GT Multi frames feature fusion (normalize to current frame's center)
+|       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
+|:-----------------:|:--------:|:-------:|:-----:|
 | Ours pos-emb      |   x  |  x  |  x  | 
 | Ours view-emb     |   x  |  x  |  x  | 
 | Ours view-vel-emb |   x  |  x  |  x  | 
@@ -92,4 +106,4 @@ d_{thr} \text{ is a hyper-paramenter meaning distance threshold which is set as 
 | ScanRefer | x | x | x |
 | Referit3d | x | x | x |
 | InstanceRefer | x | x | x |
-| 3DJCG | x | x | x | 
+| 3DJCG | 15.38 | 13.60 | 9.87 | 
