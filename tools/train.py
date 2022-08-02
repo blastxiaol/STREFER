@@ -22,7 +22,7 @@ def set_random_seed(seed):
 
 def get_args_parser():
     parser = argparse.ArgumentParser('Set config')
-    parser.add_argument('--dataset', default='strefer', type=str, help='dataset')
+    parser.add_argument('--dataset', default='strefer_gt', type=str, help='dataset')
     parser.add_argument('--data_path', default='/remote-home/share/SHTperson', type=str, help='point cloud path')
     parser.add_argument('--sample_points_num', default=500, type=int, help='number of sampling points')
     parser.add_argument('--img_shape', default=(1280, 720), type=tuple, help='image shape')
@@ -52,11 +52,12 @@ def get_args_parser():
     parser.add_argument('--cat_spatial', action='store_true')
 
     parser.add_argument('--no_evaluate', action='store_true', help="If true, evaluate when training")
-    parser.add_argument('--epoch', default=80, type=int)
+    parser.add_argument('--epoch', default=40, type=int)
     parser.add_argument('--lr', default=1e-4, type=float)
     parser.add_argument('--lr_bert', default=1e-5, type=float)
 
     parser.add_argument('--seed', default=42, type=int)
+    parser.add_argument('--load_from', default='', type=str, help="ViLBert pretrained file path")
     parser.add_argument('--val_epoch', default=1, type=int)
     parser.add_argument('--no_verbose', action='store_true', help="If true, not print information")
     parser.add_argument('--work_dir', default='work_dir/vil_bert3d', type=str)
@@ -65,7 +66,7 @@ def get_args_parser():
     if args.debug:
         args.work_dir = "debug"
         # args.num_workers = 0
-        # args.batch_size = 2
+        # args.batch_size = 1
     return args
 
 
@@ -172,9 +173,9 @@ def main(args):
     print("Create dataset")
     train_dataset = create_dataset(args, 'train')
     val_dataset1 = create_dataset(args, 'test')
-    val_dataset2 = create_dataset(args, 'train')
-    val_dataset = [val_dataset1, val_dataset2]
-    # val_dataset = [val_dataset1]
+    # val_dataset2 = create_dataset(args, 'train')
+    # val_dataset = [val_dataset1, val_dataset2]
+    val_dataset = [val_dataset1]
                                 
     print("Create Model")
     model = create_model(args).cuda()
@@ -190,7 +191,7 @@ def main(args):
             {'params':model.matching.parameters(), 'lr':args.lr_bert},
         ]
     optimizer = torch.optim.AdamW(param_list, lr=args.lr)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [50, 55, 65, 70, 75], gamma=0.5)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [30], gamma=0.1)
     criterion = torch.nn.BCEWithLogitsLoss()
 
     print("Run")

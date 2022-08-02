@@ -7,6 +7,11 @@
 2. 2. [ ] 用pointnet++的backbone重新进行单帧输入/多帧输入的实验。
    1. [x] ~~单帧输入三组实验（pos_emb, view-base, vel-base)~~
    2. [x] 多帧输入三组实验 (但是效果不如单帧输入)
+   3. [ ] 匹配GT-pred-box
+   4. [ ] 多帧GT实验：点云融合，norm各自帧位置
+   5. [ ] 多帧GT实验：点云融合，norm当前帧位置
+   6. [ ] 多帧GT实验：特征融合，norm各自帧位置
+   7. [ ] 多帧GT实验：特征融合，norm当前帧位置
 3. 3. [ ] 增加3DJCG对比实验
 4. 4. [ ] 增加velocity误差
 5. 5. [ ] 网络描述细化（参数更详细）
@@ -46,23 +51,45 @@ d_{thr} \text{ is a hyper-paramenter meaning distance threshold which is set as 
 | 88.29 | 90.97| 77.45 | 79.81 |
 
 ## Grounding
-### Resnet34 & Pointnet++ (single frame input)
+### Resnet34 & Pointnet++ (single frames input)
 |       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
 |:-----------------:|:--------:|:-------:|:-----:|
 | Ours pos-emb      |   42.40  |  39.77  | 32.73 |   (35/80)
 | Ours view-emb     |   44.93  |  42.03  | 34.53 |   (25/80)
 | Ours view-vel-emb |   43.34  |  40.43  | 33.04 |   (35/80)
 
-### Resnet34 & Pointnet++ (multi frame input) (Only use current position)
-|       Method      | Acc@0.25 | Acc@0.5 | mIOU  | (best Epoch / 目前训练了的Epoch数   总共80个Epoch) |
-|:-----------------:|:--------:|:-------:|:-----:|:-----:|
-| Ours pos-emb      |   42.21  |  40.43  | 33.00 | (27/55) |
-| Ours view-emb     |   42.03  |  39.59  | 32.34 | (25/55) |
-| Ours view-vel-emb |   41.74  |  39.31  | 32.09 | (15/51) |
+### Resnet34 & Pointnet++ (multi frames input) (Only use current position)
+|       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
+|:-----------------:|:--------:|:-------:|:-----:|
+| Ours pos-emb      |   42.40  |  39.77  | 32.64 | (71/80) 
+| Ours view-emb     |   42.03  |  39.59  | 32.34 | (25/80) 
+| Ours view-vel-emb |   41.74  |  39.31  | 32.09 | (15/80) 
 
-### Resnet34 & Pointnet++ (multi frame input) (Use both current and previous position)
-|       Method      | Acc@0.25 | Acc@0.5 | mIOU  | (best Epoch / 目前训练了的Epoch数   总共80个Epoch) |
-|:-----------------:|:--------:|:-------:|:-----:|:-----:|
-| Ours pos-emb      |   42.96  |  40.15  | 32.95 | (25/32)
-| Ours view-emb     |   39.12  |  37.34  | 30.27 | (39/44)
-| Ours view-vel-emb |   42.68  |  40.24  | 32.82 | (39/41)
+### Resnet34 & Pointnet++ (multi frames input) (Use both current and previous position)
+|       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
+|:-----------------:|:--------:|:-------:|:-----:|
+| Ours pos-emb      |   42.96  |  40.15  | 32.95 | (25/80)
+| Ours view-emb     |   40.71  |  38.74  | 31.44 | (58/80)
+| Ours view-vel-emb |   43.15  |  40.53  | 33.32 | (65/80)
+
+# GT Multi frames (normalize to center)
+|       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
+|:-----------------:|:--------:|:-------:|:-----:|
+| Ours pos-emb      |   43.34  |  40.53  | 33.33 | 
+| Ours view-emb     |   47.28  |  44.09  | 35.97 | 
+| Ours view-vel-emb |   44.56  |  41.46  | 34.25 | 
+
+# GT Multi frames (normalize to current frame's center)
+|       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
+|:-----------------:|:--------:|:-------:|:-----:|
+| Ours pos-emb      |   x  |  x  |  x  | 
+| Ours view-emb     |   x  |  x  |  x  | 
+| Ours view-vel-emb |   x  |  x  |  x  | 
+
+# Comparison Experiment
+| Method | Acc@0.25 | Acc@0.5 | mIOU |
+|:------:|:--------:|:-------:|:----:|
+| ScanRefer | x | x | x |
+| Referit3d | x | x | x |
+| InstanceRefer | x | x | x |
+| 3DJCG | x | x | x | 

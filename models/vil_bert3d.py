@@ -102,6 +102,10 @@ class ViLBert3D(nn.Module):
         if args.use_vel:
             spatial_dim = 9
         self.matching = ViLBert(spatial_dim, args.vilbert_config_path, args.vil_pretrained_file)
+
+        if args.load_from:
+            print(f"Load Model from '{args.load_from}'")
+            self.load_state_dict(torch.load(args.load_from))
     
     def forward(self, image, boxes2d, points, spatial, vis_mask, token, mask, segment_ids, **kwargs):
         # extract point cloud feature

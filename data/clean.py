@@ -131,11 +131,15 @@ def get_frame_info(frame_name, id, group_id, scene_id, frame_anno):
     bbox = None
     image_name = None
     image_bbox = None
+
+    id_list = []
+
     all_bboxes_3d = []
     for frame_id, frame in enumerate(anno['frames']):
         frame_name = frame['frame_name'].split('/')[-1]
         if point_cloud_name == frame_name:
             for item in frame['items']:
+                id_list.append(item['id'])
                 all_bboxes_3d.append([item['position']['x'], item['position']['y'], item['position']['z'], 
                         item['boundingbox']['x'], item['boundingbox']['y'], item['boundingbox']['z'],
                         item['rotation']])
@@ -143,6 +147,7 @@ def get_frame_info(frame_name, id, group_id, scene_id, frame_anno):
                     bbox = [item['position']['x'], item['position']['y'], item['position']['z'], 
                         item['boundingbox']['x'], item['boundingbox']['y'], item['boundingbox']['z'],
                         item['rotation']]
+                
         
             image = frame['images'][0]
             image_name = image['image_name'].split('/')[-1]
@@ -158,6 +163,7 @@ def get_frame_info(frame_name, id, group_id, scene_id, frame_anno):
     assert frame_id is not None
     assert image_name is not None
 
+    
 
     if not os.path.exists(os.path.join("/remote-home/share/SHTperson", group_id, scene_id, 'left', image_name)):
         return None
@@ -176,6 +182,8 @@ def get_frame_info(frame_name, id, group_id, scene_id, frame_anno):
         height = ymax - ymin
         image_bbox = [center_x, center_y, width, height]
 
+    assert len(id_list) > 0
+
     data_dict['group_id'] = group_id
     data_dict['scene_id'] = scene_id
     data_dict['frame_id'] = str(frame_id)
@@ -184,6 +192,7 @@ def get_frame_info(frame_name, id, group_id, scene_id, frame_anno):
     data_dict['image_name'] = image_name
     data_dict['image_bbox'] = image_bbox
     data_dict['all_bboxes_3d'] = all_bboxes_3d
+    data_dict['re_id'] = id_list
     return data_dict
 
 
@@ -267,6 +276,9 @@ def trans_type(anno_file):
         frame_bboxes = [[item['position']['x'], item['position']['y'], item['position']['z'], 
                         item['boundingbox']['x'], item['boundingbox']['y'], item['boundingbox']['z'],
                         item['rotation']] for item in all_items]
+
+        id_list = [item['id'] for item in all_items]
+
         id_3d = obj_item['id']
 
         prev_frame = frame_anno['previous']
@@ -340,6 +352,7 @@ def trans_type(anno_file):
         new_data['point_cloud']['bbox'] = bbox
         new_data['point_cloud']['all_bboxes'] = frame_bboxes
         new_data['point_cloud']['category'] = category
+        new_data['point_cloud']['re_id'] = id_list
         # new_data['point_cloud']['velocity'] = velocity
 
         new_data['image'] = {}
