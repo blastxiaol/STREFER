@@ -10,9 +10,8 @@ import cv2
 from tqdm import tqdm
 import math
 import cmath
-import pickle
 
-class STREFER_MFGT(Dataset):
+class STREFER_MF(Dataset):
     def __init__(self, args, split):
         super().__init__()
         self.split = split
@@ -44,17 +43,14 @@ class STREFER_MFGT(Dataset):
         self.volume = self.lmax * self.wmax * self.hmax
 
         self.target_threshold = args.threshold
-        self.relative_spatial = args.relative_spatial
+        self.rel_threshold = args.rel_dist_threshold
 
         self.spatial_dim = 8
         if args.use_view:
             self.spatial_dim = 7
         if args.use_vel:
             self.spatial_dim = 9
-        if args.use_gt:
-            self.current2prev = pickle.load(open("data/current2prev_gt.pkl", 'rb'))
-        else:
-            self.current2prev = pickle.load(open("data/current2prev.pkl", 'rb'))
+    
 
     def __getitem__(self, index):
         data = self.dataset[index]
@@ -76,6 +72,13 @@ class STREFER_MFGT(Dataset):
         image = cv2.resize(image, (self.x_size, self.y_size))
         image = image.transpose((2, 0, 1))
 
+        prev_image_name = previous_info['image_name']
+        prev_image_path = os.path.join(self.base_path, group_id, scene_id, 'left', prev_image_name)
+        prev_image = strefer_utils.load_image(prev_image_path)
+        prev_img_y_size, prev_img_x_size, prev_dim = prev_image.shape
+        prev_image = cv2.resize(prev_image, (self.x_size, self.y_size))
+        prev_image = prev_image.transpose((2, 0, 1))
+
         # read points
         point_cloud_name = point_cloud_info['point_cloud_name']
         prev_point_cloud_name = previous_info['point_cloud_name']
@@ -89,57 +92,20 @@ class STREFER_MFGT(Dataset):
             points = np.fromfile(point_cloud_path, dtype=np.float32).reshape(-1, self.dim)
             prev_point_cloud_path = os.path.join(self.base_path, group_id, scene_id, 'bin_v1', prev_point_cloud_name)
             prev_points = np.fromfile(prev_point_cloud_path, dtype=np.float32).reshape(-1, self.dim)
-        
-        # previous box concatation
+
+        # spatial
         boxes3d = np.load(f"data/pred_bboxes/{group_id}/{scene_id}/{point_cloud_name[:-4]}.npy")
         objects_pc = strefer_utils.batch_extract_pc_in_box3d(points, boxes3d, self.sample_points_num, self.dim)
         corners2d = strefer_utils.batch_compute_box_3d(boxes3d)
-        min_array = []
-        max_array = []
-        for i, pc in enumerate(objects_pc):
-            if not (pc[:, :3] == 0).all():
-                pxmin, pymin, pzmin = pc[:, :3].min(axis=0)
-                pxmax, pymax, pzmax = pc[:, :3].max(axis=0)
-                pmin = np.array([pxmin, pymin, pzmin])
-                pmax = np.array([pxmax, pymax, pzmax])
-                if (pmin == pmax).all():
-                    min_array.append(None)
-                    max_array.append(None)
-                    objects_pc[i, :, :3] = np.zeros_like(pc[:, :3])
-                else:
-                    min_array.append(pmin)
-                    max_array.append(pmax)
-                    objects_pc[i, :, :3] = strefer_utils.norm(pc[:, :3], pmin, pmax)
-            else:
-                min_array.append(None)
-                max_array.append(None)
+        object_center = boxes3d[:, :3]
 
-        prev_objects_pc = np.zeros_like(objects_pc)
-        prev_boxes3d = self.current2prev[f"{group_id}/{scene_id}/{point_cloud_name[:-4]}"]
-        assert len(prev_boxes3d) == len(objects_pc)
-        for i, prev_box in enumerate(prev_boxes3d):
-            if prev_box is None:
-                prev_objects_pc[i] = objects_pc[i].copy()
-            else:
-                prev_obj_pc_i = strefer_utils.batch_extract_pc_in_box3d(prev_points, [prev_box], self.sample_points_num, self.dim)[0]
-                if not (prev_obj_pc_i[:, :3] == 0).all():
-                    if self.relative_spatial:
-                        pmin = min_array[i]
-                        pmax = max_array[i]
-                    else:
-                        pxmin, pymin, pzmin = prev_obj_pc_i[:, :3].min(axis=0)
-                        pxmax, pymax, pzmax = prev_obj_pc_i[:, :3].max(axis=0)
-                        pmin = np.array([pxmin, pymin, pzmin])
-                        pmax = np.array([pxmax, pymax, pzmax])
-                    if (pmin == pmax).all():
-                        prev_obj_pc_i[:, :3] = np.zeros_like(prev_obj_pc_i[:, :3])
-                    else:
-                        prev_obj_pc_i[:, :3] = strefer_utils.norm(prev_obj_pc_i[:, :3], pmin, pmax)
-                    prev_objects_pc[i] = prev_obj_pc_i
-        objects_pc = np.concatenate([objects_pc, prev_objects_pc], axis=1)
+        prev_boxes3d = np.load(f"data/pred_bboxes/{group_id}/{scene_id}/{prev_point_cloud_name[:-4]}.npy")
+        prev_objects_pc = strefer_utils.batch_extract_pc_in_box3d(prev_points, prev_boxes3d, self.sample_points_num, self.dim)
+        prev_corners2d = strefer_utils.batch_compute_box_3d(prev_boxes3d)
+        prev_object_center = prev_boxes3d[:, :3]
 
-        # spatial
         spatial = []
+        prev_spatial = []
         if self.use_xyz is True:
             max_value = np.array([self.xmax, self.ymax, self.zmax, self.lmax, self.wmax, self.hmax, self.rmax])
             min_value = np.array([self.xmin, self.ymin, self.zmin, self.lmin, self.wmin, self.hmin, self.rmin])
@@ -147,9 +113,12 @@ class STREFER_MFGT(Dataset):
                 x, y, z, l, w, h, r = strefer_utils.norm(boxes3d[i][:7], min_value, max_value)
                 volume = (boxes3d[i][3] * boxes3d[i][4] * boxes3d[i][5]) /self.volume
                 spatial.append([x, y, z, l, w, h, r, volume])
+            for i in range(len(prev_boxes3d)):
+                x, y, z, l, w, h, r = strefer_utils.norm(prev_boxes3d[i][:7], min_value, max_value)
+                volume = (prev_boxes3d[i][3] * prev_boxes3d[i][4] * prev_boxes3d[i][5]) /self.volume
+                prev_spatial.append([x, y, z, l, w, h, r, volume])
         elif self.use_vel is True:
             for i in range(len(boxes3d)):
-                eachbox_2d = corners2d[i]
                 x, _, _, _, _, _, r, xvel, yvel = boxes3d[i][:9]
                 x = strefer_utils.norm(x, self.xmin, self.xmax)
                 r = strefer_utils.norm(r, self.rmin, self.rmax)
@@ -169,6 +138,26 @@ class STREFER_MFGT(Dataset):
                 ymin /= img_y_size
                 ymax /= img_y_size
                 spatial.append([xmin, ymin, xmax, ymax, x, r, square, vel, drt])
+            for i in range(len(prev_boxes3d)):
+                x, _, _, _, _, _, r, xvel, yvel = prev_boxes3d[i][:9]
+                x = strefer_utils.norm(x, self.xmin, self.xmax)
+                r = strefer_utils.norm(r, self.rmin, self.rmax)
+                vel, drt = cmath.polar(complex(xvel, yvel))
+                vel = strefer_utils.norm(vel, self.vmin, self.vmax)
+                drt = strefer_utils.norm(drt, self.rmin, self.rmax)
+                eachbox_2d = prev_corners2d[i]
+                eachbox_2d[:, 0][eachbox_2d[:, 0]<0] = 0
+                eachbox_2d[:, 0][eachbox_2d[:, 0]>=prev_img_x_size] = prev_img_x_size-1
+                eachbox_2d[:, 1][eachbox_2d[:, 1]<0] = 0
+                eachbox_2d[:, 1][eachbox_2d[:, 1]>=prev_img_y_size] = prev_img_y_size-1
+                xmin, ymin = eachbox_2d.min(axis=0)
+                xmax, ymax = eachbox_2d.max(axis=0)
+                square = (ymax - ymin) * (xmax - xmin) / (prev_img_x_size * prev_img_y_size)
+                xmin /= prev_img_x_size
+                xmax /= prev_img_x_size
+                ymin /= prev_img_y_size
+                ymax /= prev_img_y_size
+                prev_spatial.append([xmin, ymin, xmax, ymax, x, r, square, vel, drt])
         elif self.use_view is True:
             for i in range(len(boxes3d)):
                 eachbox_2d = corners2d[i]
@@ -188,24 +177,50 @@ class STREFER_MFGT(Dataset):
                 ymin /= img_y_size
                 ymax /= img_y_size
                 spatial.append([xmin, ymin, xmax, ymax, x, r, square])
+            for i in range(len(prev_boxes3d)):
+                x, _, _, _, _, _, r = prev_boxes3d[i][:7]
+                x = strefer_utils.norm(x, self.xmin, self.xmax)
+                r = strefer_utils.norm(r, self.rmin, self.rmax)
+                eachbox_2d = prev_corners2d[i]
+                eachbox_2d[:, 0][eachbox_2d[:, 0]<0] = 0
+                eachbox_2d[:, 0][eachbox_2d[:, 0]>=prev_img_x_size] = prev_img_x_size-1
+                eachbox_2d[:, 1][eachbox_2d[:, 1]<0] = 0
+                eachbox_2d[:, 1][eachbox_2d[:, 1]>=prev_img_y_size] = prev_img_y_size-1
+                xmin, ymin = eachbox_2d.min(axis=0)
+                xmax, ymax = eachbox_2d.max(axis=0)
+                square = (ymax - ymin) * (xmax - xmin) / (prev_img_x_size * prev_img_y_size)
+                xmin /= prev_img_x_size
+                xmax /= prev_img_x_size
+                ymin /= prev_img_y_size
+                ymax /= prev_img_y_size
+                prev_spatial.append([xmin, ymin, xmax, ymax, x, r, square])
         else:
             raise NotImplementedError
-                
-
         spatial = np.array(spatial, dtype=np.float32)
-        
+        prev_spatial = np.array(prev_spatial, dtype=np.float32)
+
         # bboxes2d
         boxes2d = []
         for box in corners2d:
             xmin, ymin = box.min(axis=0)
             xmax, ymax = box.min(axis=0)
-        #     xmin, ymin, xmax, ymax = box
             xmin = int(xmin * self.x_size / img_x_size)
             xmax = int(xmax * self.x_size / img_x_size)
             ymin = int(ymin * self.y_size / img_y_size)
             ymax = int(ymax * self.y_size / img_y_size)
             boxes2d.append([xmin, ymin, xmax, ymax])
         boxes2d = np.array(boxes2d)
+    
+        prev_boxes2d = []
+        for box in prev_corners2d:
+            xmin, ymin = box.min(axis=0)
+            xmax, ymax = box.min(axis=0)
+            xmin = int(xmin * self.x_size / prev_img_x_size)
+            xmax = int(xmax * self.x_size / prev_img_x_size)
+            ymin = int(ymin * self.y_size / prev_img_y_size)
+            ymax = int(ymax * self.y_size / prev_img_y_size)
+            prev_boxes2d.append([xmin, ymin, xmax, ymax])
+        prev_boxes2d = np.array(prev_boxes2d)
 
         # target
         target = np.zeros((len(boxes3d), ), dtype=np.float32)
@@ -218,12 +233,23 @@ class STREFER_MFGT(Dataset):
         sentence = language_info['description'].lower()
         sentence = "[CLS] " + sentence + " [SEP]"
         token = self.tokenizer.encode(sentence)
-        return image, boxes2d, objects_pc, spatial, token, target
+
+        # relative distance
+        rel_dist_mask = np.zeros((len(object_center), len(prev_object_center)), dtype=np.bool)
+        for i in range(rel_dist_mask.shape[0]):
+            obj_pos = object_center[i]
+            for j in range(rel_dist_mask.shape[1]):
+                prev_obj_pos = prev_object_center[j]
+                dist = np.sqrt(np.power(obj_pos - prev_obj_pos, 2).sum())
+                if dist < self.rel_threshold:
+                    rel_dist_mask[i, j] = 1
+
+        return image, boxes2d, objects_pc, spatial, token, target, prev_image, prev_boxes2d, prev_objects_pc, prev_spatial, rel_dist_mask
     
     def collate_fn(self, raw_batch):
         raw_batch = list(zip(*raw_batch))
 
-        # image
+        # image  & prev_image
         image_list = raw_batch[0]
         image = []
         for img in image_list:
@@ -231,10 +257,20 @@ class STREFER_MFGT(Dataset):
             image.append(img)
         image = torch.stack(image, dim=0)
 
-        # boxes2d
+        prev_image_list = raw_batch[6]
+        prev_image = []
+        for img in prev_image_list:
+            img = torch.tensor(img, dtype=self.data_type)
+            prev_image.append(img)
+        prev_image = torch.stack(prev_image, dim=0)
+
+        # boxes2d & prev_boxes2d
         boxes2d_list = raw_batch[1]
         max_obj_num = 0
         for each_boxes2d in boxes2d_list:
+            max_obj_num = max(max_obj_num, each_boxes2d.shape[0])
+        prev_boxes2d_list = raw_batch[7]
+        for each_boxes2d in prev_boxes2d_list:
             max_obj_num = max(max_obj_num, each_boxes2d.shape[0])
         
         boxes2d = torch.zeros((len(boxes2d_list), max_obj_num, 4), dtype=self.data_type)
@@ -243,18 +279,35 @@ class STREFER_MFGT(Dataset):
             each_boxes2d = torch.tensor(each_boxes2d)
             boxes2d[i, :each_boxes2d.shape[0], :] = each_boxes2d
             vis_mask[i, :each_boxes2d.shape[0]] = 1
-
-        # points
+        
+        prev_boxes2d = torch.zeros((len(prev_boxes2d_list), max_obj_num, 4), dtype=self.data_type)
+        prev_vis_mask = torch.zeros((len(prev_boxes2d_list), max_obj_num), dtype=torch.long)
+        for i, each_boxes2d in enumerate(prev_boxes2d_list):
+            each_boxes2d = torch.tensor(each_boxes2d)
+            prev_boxes2d[i, :each_boxes2d.shape[0], :] = each_boxes2d
+            prev_vis_mask[i, :each_boxes2d.shape[0]] = 1
+        
+        # points & prev_points
         objects_pc = raw_batch[2]
-        points = torch.zeros((len(boxes2d_list), max_obj_num, self.sample_points_num * 2, self.dim), dtype=self.data_type)
+        points = torch.zeros((len(boxes2d_list), max_obj_num, self.sample_points_num, self.dim), dtype=self.data_type)
         for i, pt in enumerate(objects_pc):
             points[i, :pt.shape[0], :, :] = torch.tensor(pt)
+        
+        prev_objects_pc = raw_batch[8]
+        prev_points = torch.zeros((len(prev_boxes2d_list), max_obj_num, self.sample_points_num, self.dim), dtype=self.data_type)
+        for i, pt in enumerate(prev_objects_pc):
+            prev_points[i, :pt.shape[0], :, :] = torch.tensor(pt)
 
-        # spatial
+        # spatial & prev_spatial
         spatial_list = raw_batch[3]
         spatial = torch.zeros((len(boxes2d_list), max_obj_num, self.spatial_dim), dtype=self.data_type)
         for i, box in enumerate(spatial_list):
             spatial[i, :box.shape[0], :] = torch.tensor(box)
+        
+        prev_spatial_list = raw_batch[9]
+        prev_spatial = torch.zeros((len(boxes2d_list), max_obj_num, self.spatial_dim), dtype=self.data_type)
+        for i, box in enumerate(prev_spatial_list):
+            prev_spatial[i, :box.shape[0], :] = torch.tensor(box)
 
         # token
         token_list = raw_batch[4]
@@ -275,13 +328,23 @@ class STREFER_MFGT(Dataset):
         target_list = raw_batch[5]
         target = torch.zeros((len(boxes2d_list), max_obj_num), dtype=self.data_type)
         for i, each_target in enumerate(target_list):
-            target[i, :len(each_target)] = torch.tensor(each_target)
+            target[i, :len(each_target)] = torch.tensor(each_target) 
+        
+        # rel_dist_mask
+        rel_dist_mask_list = raw_batch[10]
+        rel_dist_mask = torch.zeros((len(boxes2d_list), max_obj_num, max_obj_num), dtype=torch.bool)
+        for i, each_dist_mask in enumerate(rel_dist_mask_list):
+            rel_dist_mask[i, :each_dist_mask.shape[0], :each_dist_mask.shape[1]] = torch.tensor(each_dist_mask)
+   
+        output = dict(
+            image=image, boxes2d=boxes2d, points=points, spatial=spatial, vis_mask=vis_mask,
+            prev_image=prev_image, prev_boxes2d=prev_boxes2d, prev_points=prev_points, prev_spatial=prev_spatial, prev_vis_mask=prev_vis_mask,
+            token=token, mask=mask, segment_ids=segment_ids, 
+            rel_dist_mask=rel_dist_mask,
+            target=target
+        )      
 
-        data = dict(image=image, boxes2d=boxes2d, points=points, spatial=spatial,
-                    vis_mask=vis_mask, token=token, mask=mask, segment_ids=segment_ids,
-                    target=target)    
-
-        return data
+        return output
     
     def __len__(self):
         return len(self.dataset)

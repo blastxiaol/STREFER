@@ -22,7 +22,7 @@ def set_random_seed(seed):
 
 def get_args_parser():
     parser = argparse.ArgumentParser('Set config')
-    parser.add_argument('--dataset', default='strefer_gt', type=str, help='dataset')
+    parser.add_argument('--dataset', default='strefer', type=str, help='dataset')
     parser.add_argument('--data_path', default='/remote-home/share/SHTperson', type=str, help='point cloud path')
     parser.add_argument('--sample_points_num', default=500, type=int, help='number of sampling points')
     parser.add_argument('--img_shape', default=(1280, 720), type=tuple, help='image shape')
@@ -34,6 +34,8 @@ def get_args_parser():
     parser.add_argument('--threshold', default=0.25, type=float, help='target threshold')
     parser.add_argument('--rel_dist_threshold', default=1.0, type=float, help='relative distance threshold for multi-objects association')
     parser.add_argument('--matching_threshold', default=0.7, type=float, help='similarity matching threshold for multi-objects association')
+    parser.add_argument('--feature_fusion', action='store_true', help="Use feature level fusion")
+    parser.add_argument('--frame_num', default=1, type=int, help='frame_num')
 
     parser.add_argument('--batch_size', default=16, type=int)
     parser.add_argument('--num_workers', default=8, type=int)
@@ -50,6 +52,7 @@ def get_args_parser():
     parser.add_argument('--vilbert_config_path', default='configs/bert_base_6layer_6conect.json', type=str, help="ViLBert config file path")
     parser.add_argument('--vil_pretrained_file', default='pretrained_model/multi_task_model.bin', type=str, help="ViLBert pretrained file path")
     parser.add_argument('--cat_spatial', action='store_true')
+    parser.add_argument('--use_center', action='store_true')
 
     parser.add_argument('--no_evaluate', action='store_true', help="If true, evaluate when training")
     parser.add_argument('--epoch', default=40, type=int)
@@ -67,8 +70,8 @@ def get_args_parser():
     args = parser.parse_args()
     if args.debug:
         args.work_dir = "debug"
-        # args.num_workers = 0
-        # args.batch_size = 1
+        args.num_workers = 0
+        args.batch_size = 2
     return args
 
 

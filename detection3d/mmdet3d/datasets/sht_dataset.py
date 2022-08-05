@@ -435,23 +435,26 @@ class SHtechDataset(Custom3DDataset):
                 file_path = os.path.join(scene_path, f"{pts_name[:-4]}.npy")
 
                 centers = pred_bboxes[:, :3].copy()
-                points = np.insert(centers, 3, values=1, axis=1)
-                points_T = np.transpose(points)
-                points_T[3, :] = 1.0
-                # lidar2camera
-                points_T_camera = np.dot(ex_matrix, points_T)
-                # camera2pixel
-                pixel = np.dot(in_matrix, points_T_camera).T
-                pixel_xy = np.array([x / x[2] for x in pixel])[:, 0:2]
-                pixel_xy = np.around(pixel_xy).astype(int)
+                if centers.shape[0] > 0:
+                    points = np.insert(centers, 3, values=1, axis=1)
+                    points_T = np.transpose(points)
+                    points_T[3, :] = 1.0
+                    # lidar2camera
+                    points_T_camera = np.dot(ex_matrix, points_T)
+                    # camera2pixel
+                    pixel = np.dot(in_matrix, points_T_camera).T
+                    pixel_xy = np.array([x / x[2] for x in pixel])[:, 0:2]
+                    pixel_xy = np.around(pixel_xy).astype(int)
 
-                filter_pred_bboxes = []
-                for k in range(pixel_xy.shape[0]):
-                    x, y = pixel_xy[k]
-                    if 0 <= x < 1280 and 0 <= y < 720:
-                        filter_pred_bboxes.append(pred_bboxes[k])
-                if len(filter_pred_bboxes) > 0:
-                    filter_pred_bboxes = np.vstack(filter_pred_bboxes)
+                    filter_pred_bboxes = []
+                    for k in range(pixel_xy.shape[0]):
+                        x, y = pixel_xy[k]
+                        if 0 <= x < 1280 and 0 <= y < 720:
+                            filter_pred_bboxes.append(pred_bboxes[k])
+                    if len(filter_pred_bboxes) > 0:
+                        filter_pred_bboxes = np.vstack(filter_pred_bboxes)
+                    else:
+                        filter_pred_bboxes = np.zeros((0, 9), dtype=np.float32)
                 else:
                     filter_pred_bboxes = np.zeros((0, 9), dtype=np.float32)
                 np.save(file_path, filter_pred_bboxes)

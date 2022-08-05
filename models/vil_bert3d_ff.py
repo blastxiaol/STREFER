@@ -36,13 +36,27 @@ class PointCloudExtactor(nn.Module):
                                    sa_mlps=[[dim, 64, 64, 128],
                                             [128, 128, 128, 256],
                                             [256, 256, 512, args.pc_out_dim]])
+        # self.pos_emb = nn.Linear(3, args.pc_out_dim)
+        self.fusion = nn.Linear(args.pc_out_dim * 2, args.pc_out_dim)
         self.proj = nn.Linear(args.pc_out_dim, args.vis_out_dim)
 
-
-    def forward(self, points):
+    def forward(self, points, prev_points, obj_center, prev_obj_center):
+        # feature extraction
         point_cloud_feature = self.pointnet.get_siamese_features(points, aggregator=torch.stack)
-        point_cloud_feature = self.proj(point_cloud_feature)
-        return point_cloud_feature
+        prev_point_cloud_feature = self.pointnet.get_siamese_features(prev_points, aggregator=torch.stack)
+
+        # position
+        # obj_center = self.pos_emb(obj_center)
+        # prev_obj_center = self.pos_emb(prev_obj_center)
+        # point_cloud_feature = point_cloud_feature + obj_center
+        # prev_point_cloud_feature = prev_point_cloud_feature + prev_obj_center
+        
+        # fusion
+        feature = torch.cat([point_cloud_feature, prev_point_cloud_feature], dim=2)
+        feature = self.fusion(feature)
+
+        feature = self.proj(feature)
+        return feature
 
 class ImageExtractor(nn.Module):
     def __init__(self, args):
@@ -90,7 +104,7 @@ class PointcloudImageFusion(nn.Module):
         visual_feature = self.linear(visual_feature)
         return visual_feature
 
-class ViLBert3D(nn.Module):
+class ViLBert3DFF(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.point_cloud_extractor = PointCloudExtactor(args)
@@ -103,21 +117,14 @@ class ViLBert3D(nn.Module):
             spatial_dim = 9
         self.matching = ViLBert(spatial_dim, args.vilbert_config_path, args.vil_pretrained_file)
 
-        self.use_center = args.use_center
-        if self.use_center:
-            self.pos_emb = nn.Linear(6, args.vis_out_dim)
-
         if args.load_from:
             print(f"Load Model from '{args.load_from}'")
             self.load_state_dict(torch.load(args.load_from), strict=False)
     
-    def forward(self, image, boxes2d, points, spatial, vis_mask, token, mask, segment_ids, obj_center, **kwargs):
+    def forward(self, image, boxes2d, points, spatial, vis_mask, token, mask, segment_ids, prev_points, obj_center, prev_obj_center, **kwargs):
         # extract point cloud feature
-        point_cloud_feature = self.point_cloud_extractor(points)
-        if self.use_center:
-            obj_center = self.pos_emb(obj_center)
-            point_cloud_feature = point_cloud_feature + obj_center
-
+        point_cloud_feature = self.point_cloud_extractor(points, prev_points, obj_center, prev_obj_center)
+        
         # extract image feature
         image_feature = self.image_extractor(image, boxes2d)
 

@@ -9,14 +9,15 @@
    2. [x] ~~多帧输入三组实验 (但是效果不如单帧输入)~~
    3. [x] ~~匹配GT-pred-box~~
    4. [x] ~~多帧GT实验：点云融合，norm各自帧位置~~
-   5. [ ] 多帧GT实验：点云融合，norm当前帧位置
-   6. [ ] 多帧GT实验：特征融合，norm各自帧位置
-   7. [ ] 多帧GT实验：特征融合，norm当前帧位置
-3. 3. [ ] 增加3DJCG对比实验
-4. 4. [ ] 增加velocity误差
-5. 5. [ ] 网络描述细化（参数更详细）
-6. 6. [ ] 表格命名修订（更细化、明显）
-7. 7. [ ] 细化数据集标注规则流程
+   5. [ ] 多帧实验：特征融合，norm各自帧位置
+   6. [ ] 三帧以上实验
+3. 3. [x] ~~增加3DJCG对比实验~~
+4. 4. [ ] 3DVG-Transformer 对比实验
+5. 5. [x] AAAI格式
+6. 6. [ ] 增加velocity误差
+7. 7. [ ] 网络描述细化（参数更详细）
+8. 8. [ ] 表格命名修订（更细化、明显）
+9. 9. [ ] 细化数据集标注规则流程
 
 # Dataset
 数据集划分后：总共71个不同场景，56个场景划为训练场景，15个为测试场景。最终4392条训练集数据，1066条测试数据，测试集中出现的词至少在训练集中出现两次。
@@ -54,23 +55,23 @@ d_{thr} \text{ is a hyper-paramenter meaning distance threshold which is set as 
 ### Resnet34 & Pointnet++ (single frames input)
 |       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
 |:-----------------:|:--------:|:-------:|:-----:|
-| Ours pos-emb      |   42.40  |  39.77  | 32.73 |   (35/80)
-| Ours view-emb     |   44.93  |  42.03  | 34.53 |   (25/80)
-| Ours view-vel-emb |   43.34  |  40.43  | 33.04 |   (35/80)
+| Ours pos-emb      |   42.40  |  39.77  | 32.73 | 
+| Ours view-emb     |   44.93  |  42.03  | 34.53 | 
+| Ours view-vel-emb |   43.34  |  40.43  | 33.04 | 
 
 ### Resnet34 & Pointnet++ (multi frames input) (Only use current position)
 |       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
 |:-----------------:|:--------:|:-------:|:-----:|
-| Ours pos-emb      |   42.40  |  39.77  | 32.64 | (71/80) 
-| Ours view-emb     |   42.03  |  39.59  | 32.34 | (25/80) 
-| Ours view-vel-emb |   41.74  |  39.31  | 32.09 | (15/80) 
+| Ours pos-emb      |   42.40  |  39.77  | 32.64 | 
+| Ours view-emb     |   42.03  |  39.59  | 32.34 | 
+| Ours view-vel-emb |   41.74  |  39.31  | 32.09 | 
 
 ### Resnet34 & Pointnet++ (multi frames input) (Use both current and previous position)
 |       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
 |:-----------------:|:--------:|:-------:|:-----:|
-| Ours pos-emb      |   42.96  |  40.15  | 32.95 | (25/80)
-| Ours view-emb     |   40.71  |  38.74  | 31.44 | (58/80)
-| Ours view-vel-emb |   43.15  |  40.53  | 33.32 | (65/80)
+| Ours pos-emb      |   42.96  |  40.15  | 32.95 | 
+| Ours view-emb     |   40.71  |  38.74  | 31.44 |
+| Ours view-vel-emb |   43.15  |  40.53  | 33.32 |
 
 ### GT Multi frames (normalize to center)
 |       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
@@ -86,14 +87,28 @@ d_{thr} \text{ is a hyper-paramenter meaning distance threshold which is set as 
 | Ours view-emb     |   45.12  |  41.74  |  34.35  | 
 | Ours view-vel-emb |   x  |  x  |  x  | 
 
-### GT Multi frames feature fusion(normalize to center)
+### Multi frames Input Fusion w/o center
+|       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
+|:-----------------:|:--------:|:-------:|:-----:|
+| Ours pos-emb      |   42.87  |  40.53  | 33.09 | 
+| Ours view-emb     |   45.87  |  42.40  | 34.93 | 
+| Ours view-vel-emb |   x  |  x  |  x  | 
+
+### Multi-frame Feature Fusion w center
+|       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
+|:-----------------:|:--------:|:-------:|:-----:|
+| Ours pos-emb      |   x  |  x  |  x  | 
+| Ours view-emb     |   42.31  |  39.68  |  32.63  | 
+| Ours view-vel-emb |   x  |  x  |  x  | 
+
+### Multi frames feature fusion (normalize to center)
 |       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
 |:-----------------:|:--------:|:-------:|:-----:|
 | Ours pos-emb      |   x  |  x  |  x  | 
 | Ours view-emb     |   x  |  x  |  x  | 
 | Ours view-vel-emb |   x  |  x  |  x  | 
 
-### GT Multi frames feature fusion (normalize to current frame's center)
+### Multi frames feature fusion (normalize to current frame's center)
 |       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
 |:-----------------:|:--------:|:-------:|:-----:|
 | Ours pos-emb      |   x  |  x  |  x  | 
@@ -105,5 +120,6 @@ d_{thr} \text{ is a hyper-paramenter meaning distance threshold which is set as 
 |:------:|:--------:|:-------:|:----:|
 | ScanRefer | x | x | x |
 | Referit3d | x | x | x |
-| InstanceRefer | x | x | x |
+| InstanceRefer | 41.63 | 27.39 | x |
+| 3DVG-Transformer | x | x | x |
 | 3DJCG | 15.38 | 13.60 | 9.87 | 

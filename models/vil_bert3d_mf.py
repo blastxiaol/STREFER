@@ -165,10 +165,11 @@ class ViLBert3DMF(nn.Module):
             spatial_dim = 9
         spatial_dim = spatial_dim * factor
         self.matching = ViLBert(spatial_dim, args.vilbert_config_path, args.vil_pretrained_file)
+
     
     def forward(self, image, boxes2d, points, spatial, vis_mask, 
                     prev_image, prev_boxes2d, prev_points, prev_spatial, prev_vis_mask, 
-                    token, mask, segment_ids, rel_dist_mask, **kwargs):
+                    token, mask, segment_ids, rel_dist_mask, obj_center, **kwargs):
         """
         image:         [B, 3, W, H]            | prev_image:    [B, 3, W, H] 
         boxes2d:       [B, N_obj, 4]           | prev_boxes2d:  [B, N_obj, 4]
@@ -183,7 +184,7 @@ class ViLBert3DMF(nn.Module):
         # extract point cloud feature
         point_cloud_feature = self.point_cloud_extractor(points)
         prev_point_cloud_feature = self.point_cloud_extractor(prev_points)
-
+        
         # extract image feature
         image_feature = self.image_extractor(image, boxes2d)
         prev_image_feature = self.image_extractor(prev_image, prev_boxes2d)

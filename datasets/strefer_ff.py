@@ -94,8 +94,8 @@ class STREFER_FF(Dataset):
         boxes3d = np.load(f"data/pred_bboxes/{group_id}/{scene_id}/{point_cloud_name[:-4]}.npy")
         objects_pc = strefer_utils.batch_extract_pc_in_box3d(points, boxes3d, self.sample_points_num, self.dim)
         corners2d = strefer_utils.batch_compute_box_3d(boxes3d)
-        min_array = []
-        max_array = []
+        obj_center = boxes3d[:, :3]
+
         for i, pc in enumerate(objects_pc):
             if not (pc[:, :3] == 0).all():
                 pxmin, pymin, pzmin = pc[:, :3].min(axis=0)
@@ -103,40 +103,34 @@ class STREFER_FF(Dataset):
                 pmin = np.array([pxmin, pymin, pzmin])
                 pmax = np.array([pxmax, pymax, pzmax])
                 if (pmin == pmax).all():
-                    min_array.append(None)
-                    max_array.append(None)
                     objects_pc[i, :, :3] = np.zeros_like(pc[:, :3])
                 else:
-                    min_array.append(pmin)
-                    max_array.append(pmax)
                     objects_pc[i, :, :3] = strefer_utils.norm(pc[:, :3], pmin, pmax)
-            else:
-                min_array.append(None)
-                max_array.append(None)
-
+        
         prev_objects_pc = np.zeros_like(objects_pc)
         prev_boxes3d = self.current2prev[f"{group_id}/{scene_id}/{point_cloud_name[:-4]}"]
+        prev_obj_center = np.zeros_like(obj_center)
         assert len(prev_boxes3d) == len(objects_pc)
         for i, prev_box in enumerate(prev_boxes3d):
             if prev_box is None:
                 prev_objects_pc[i] = objects_pc[i].copy()
+                prev_obj_center[i] = obj_center[i]
             else:
                 prev_obj_pc_i = strefer_utils.batch_extract_pc_in_box3d(prev_points, [prev_box], self.sample_points_num, self.dim)[0]
+                prev_obj_center[i] = prev_box[:3]
                 if not (prev_obj_pc_i[:, :3] == 0).all():
-                    if self.relative_spatial:
-                        pmin = min_array[i]
-                        pmax = max_array[i]
-                    else:
-                        pxmin, pymin, pzmin = prev_obj_pc_i[:, :3].min(axis=0)
-                        pxmax, pymax, pzmax = prev_obj_pc_i[:, :3].max(axis=0)
-                        pmin = np.array([pxmin, pymin, pzmin])
-                        pmax = np.array([pxmax, pymax, pzmax])
+                    pxmin, pymin, pzmin = prev_obj_pc_i[:, :3].min(axis=0)
+                    pxmax, pymax, pzmax = prev_obj_pc_i[:, :3].max(axis=0)
+                    pmin = np.array([pxmin, pymin, pzmin])
+                    pmax = np.array([pxmax, pymax, pzmax])
                     if (pmin == pmax).all():
                         prev_obj_pc_i[:, :3] = np.zeros_like(prev_obj_pc_i[:, :3])
                     else:
                         prev_obj_pc_i[:, :3] = strefer_utils.norm(prev_obj_pc_i[:, :3], pmin, pmax)
                     prev_objects_pc[i] = prev_obj_pc_i
-        objects_pc = np.concatenate([objects_pc, prev_objects_pc], axis=1)
+        
+        obj_center = strefer_utils.norm(obj_center, np.array([self.xmin, self.ymin, self.zmin]), np.array([self.xmax, self.ymax, self.zmax]))    
+        prev_obj_center = strefer_utils.norm(prev_obj_center, np.array([self.xmin, self.ymin, self.zmin]), np.array([self.xmax, self.ymax, self.zmax]))    
 
         # spatial
         spatial = []
@@ -218,7 +212,9 @@ class STREFER_FF(Dataset):
         sentence = language_info['description'].lower()
         sentence = "[CLS] " + sentence + " [SEP]"
         token = self.tokenizer.encode(sentence)
-        return image, boxes2d, objects_pc, spatial, token, target
+        return image, boxes2d, objects_pc, spatial, token, target,\
+               prev_objects_pc, obj_center, prev_obj_center
+
     
     def collate_fn(self, raw_batch):
         raw_batch = list(zip(*raw_batch))
@@ -246,9 +242,14 @@ class STREFER_FF(Dataset):
 
         # points
         objects_pc = raw_batch[2]
-        points = torch.zeros((len(boxes2d_list), max_obj_num, self.sample_points_num * 2, self.dim), dtype=self.data_type)
+        points = torch.zeros((len(boxes2d_list), max_obj_num, self.sample_points_num, self.dim), dtype=self.data_type)
         for i, pt in enumerate(objects_pc):
             points[i, :pt.shape[0], :, :] = torch.tensor(pt)
+        
+        prev_objects_pc = raw_batch[6]
+        prev_points = torch.zeros((len(boxes2d_list), max_obj_num, self.sample_points_num, self.dim), dtype=self.data_type)
+        for i, pt in enumerate(prev_objects_pc):
+            prev_points[i, :pt.shape[0], :, :] = torch.tensor(pt)
 
         # spatial
         spatial_list = raw_batch[3]
@@ -277,7 +278,20 @@ class STREFER_FF(Dataset):
         for i, each_target in enumerate(target_list):
             target[i, :len(each_target)] = torch.tensor(each_target)
 
+        # obj_center
+        obj_center_list = raw_batch[7]
+        obj_center = torch.zeros((len(boxes2d_list), max_obj_num, 3), dtype=self.data_type)
+        for i, each_obj_center in enumerate(obj_center_list):
+             obj_center[i, :len(each_obj_center)] = torch.tensor(each_obj_center)
+        
+        # prev_obj_center
+        prev_obj_center_list = raw_batch[8]
+        prev_obj_center = torch.zeros((len(boxes2d_list), max_obj_num, 3), dtype=self.data_type)
+        for i, each_obj_center in enumerate(prev_obj_center_list):
+             prev_obj_center[i, :len(each_obj_center)] = torch.tensor(each_obj_center)
+
         data = dict(image=image, boxes2d=boxes2d, points=points, spatial=spatial,
+                    prev_points=prev_points, obj_center=obj_center, prev_obj_center=prev_obj_center,
                     vis_mask=vis_mask, token=token, mask=mask, segment_ids=segment_ids,
                     target=target)    
 
