@@ -17,6 +17,7 @@ external_tools/pointnet2/pointnet2.egg-info
 
 # data
 data/pred_bboxes
+data/backbone
 
 
 # debug

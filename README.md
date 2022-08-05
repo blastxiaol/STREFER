@@ -59,20 +59,84 @@ d_{thr} \text{ is a hyper-paramenter meaning distance threshold which is set as 
 | Ours view-emb     |   44.93  |  42.03  | 34.53 | 
 | Ours view-vel-emb |   43.34  |  40.43  | 33.04 | 
 
-### Resnet34 & Pointnet++ (multi frames input) (Only use current position)
+### Multi frames Input Fusion w/o center
+|       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
+|:-----------------:|:--------:|:-------:|:-----:|
+| Ours pos-emb      |   42.87  |  40.53  | 33.09 | 
+| Ours view-emb     |   45.87  |  42.40  | 34.93 | 
+| Ours view-vel-emb |   x  |  x  |  x  | 
+
+### Multi frames Input Fusion w center
+|       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
+|:-----------------:|:--------:|:-------:|:-----:|
+| Ours pos-emb      |   x  |  x  |  x  | 
+| Ours view-emb     |   45.87  |  42.40  |  34.92  | 
+| Ours view-vel-emb |   x  |  x  |  x  | 
+
+### Multi-frame Feature Fusion w/o center
+|       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
+|:-----------------:|:--------:|:-------:|:-----:|
+| Ours pos-emb      |   x  |  x  |  x  | 
+| Ours view-emb     |   42.12  |  39.31  |  32.40  | 
+| Ours view-vel-emb |   x  |  x  |  x  | 
+
+### Multi-frame Feature Fusion w center
+|       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
+|:-----------------:|:--------:|:-------:|:-----:|
+| Ours pos-emb      |   x  |  x  |  x  | 
+| Ours view-emb     |   42.31  |  39.68  |  32.63  | 
+| Ours view-vel-emb |   x  |  x  |  x  | 
+
+
+
+
+# Comparison Experiment
+| Method | Acc@0.25 | Acc@0.5 | mIOU |
+|:------:|:--------:|:-------:|:----:|
+| ScanRefer | x | x | x |
+| Referit3d | x | x | x |
+| InstanceRefer | 39.40 | 24.02 | 22.12 |
+| 3DVG-Transformer | 16.60 | 15.51 | 10.55 |
+| 3DJCG | 15.38 | 13.60 | 9.87 |
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Useless Experiments
+### Resnet34 & Pointnet++ (multi frames feature fusion) (Only use current position)
 |       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
 |:-----------------:|:--------:|:-------:|:-----:|
 | Ours pos-emb      |   42.40  |  39.77  | 32.64 | 
 | Ours view-emb     |   42.03  |  39.59  | 32.34 | 
 | Ours view-vel-emb |   41.74  |  39.31  | 32.09 | 
 
-### Resnet34 & Pointnet++ (multi frames input) (Use both current and previous position)
+### Resnet34 & Pointnet++ (multi frames feature fusion) (Use both current and previous position)
 |       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
 |:-----------------:|:--------:|:-------:|:-----:|
 | Ours pos-emb      |   42.96  |  40.15  | 32.95 | 
 | Ours view-emb     |   40.71  |  38.74  | 31.44 |
 | Ours view-vel-emb |   43.15  |  40.53  | 33.32 |
 
+
+# GT Experiment
 ### GT Multi frames (normalize to center)
 |       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
 |:-----------------:|:--------:|:-------:|:-----:|
@@ -87,39 +151,3 @@ d_{thr} \text{ is a hyper-paramenter meaning distance threshold which is set as 
 | Ours view-emb     |   45.12  |  41.74  |  34.35  | 
 | Ours view-vel-emb |   x  |  x  |  x  | 
 
-### Multi frames Input Fusion w/o center
-|       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
-|:-----------------:|:--------:|:-------:|:-----:|
-| Ours pos-emb      |   42.87  |  40.53  | 33.09 | 
-| Ours view-emb     |   45.87  |  42.40  | 34.93 | 
-| Ours view-vel-emb |   x  |  x  |  x  | 
-
-### Multi-frame Feature Fusion w center
-|       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
-|:-----------------:|:--------:|:-------:|:-----:|
-| Ours pos-emb      |   x  |  x  |  x  | 
-| Ours view-emb     |   42.31  |  39.68  |  32.63  | 
-| Ours view-vel-emb |   x  |  x  |  x  | 
-
-### Multi frames feature fusion (normalize to center)
-|       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
-|:-----------------:|:--------:|:-------:|:-----:|
-| Ours pos-emb      |   x  |  x  |  x  | 
-| Ours view-emb     |   x  |  x  |  x  | 
-| Ours view-vel-emb |   x  |  x  |  x  | 
-
-### Multi frames feature fusion (normalize to current frame's center)
-|       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
-|:-----------------:|:--------:|:-------:|:-----:|
-| Ours pos-emb      |   x  |  x  |  x  | 
-| Ours view-emb     |   x  |  x  |  x  | 
-| Ours view-vel-emb |   x  |  x  |  x  | 
-
-# Comparison Experiment
-| Method | Acc@0.25 | Acc@0.5 | mIOU |
-|:------:|:--------:|:-------:|:----:|
-| ScanRefer | x | x | x |
-| Referit3d | x | x | x |
-| InstanceRefer | 41.63 | 27.39 | x |
-| 3DVG-Transformer | x | x | x |
-| 3DJCG | 15.38 | 13.60 | 9.87 | 

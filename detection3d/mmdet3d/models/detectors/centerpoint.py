@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+from mmdet3d.models import backbones
 import torch
 
 from mmdet3d.core import bbox3d2result, merge_aug_bboxes_3d
@@ -42,10 +43,78 @@ class CenterPoint(MVXTwoStageDetector):
         voxel_features = self.pts_voxel_encoder(voxels, num_points, coors)
         batch_size = coors[-1, 0] + 1
         x = self.pts_middle_encoder(voxel_features, coors, batch_size)
-        x = self.pts_backbone(x)
+        backbone = self.pts_backbone(x)
         if self.with_pts_neck:
-            x = self.pts_neck(x)
+            x = self.pts_neck(backbone)
         return x
+    
+    def test_extract_pts_feat(self, pts, img_feats, img_metas):
+        """Extract features of points."""
+        if not self.with_pts_bbox:
+            return None
+        voxels, num_points, coors = self.voxelize(pts)
+
+        voxel_features = self.pts_voxel_encoder(voxels, num_points, coors)
+        batch_size = coors[-1, 0] + 1
+        x = self.pts_middle_encoder(voxel_features, coors, batch_size)
+        backbone = self.pts_backbone(x)
+        if self.with_pts_neck:
+            x = self.pts_neck(backbone)
+        return x, backbone
+    
+    def extract_feat(self, points, img, img_metas):
+        """Extract features from images and points."""
+        img_feats = self.extract_img_feat(img, img_metas)
+        pts_feats = self.extract_pts_feat(points, img_feats, img_metas)
+        return (img_feats, pts_feats)
+    
+    def test_extract_feat(self, points, img, img_metas):
+        """Extract features from images and points."""
+        img_feats = self.extract_img_feat(img, img_metas)
+        pts_feats, backbone = self.test_extract_pts_feat(points, img_feats, img_metas)
+        return (img_feats, pts_feats, backbone[-1])
+    
+    def simple_test(self, points, img_metas, img=None, rescale=False):
+        """Test function without augmentaiton."""
+        img_feats, pts_feats, backbone = self.test_extract_feat(
+            points, img=img, img_metas=img_metas)
+        
+        bbox_list = [dict() for i in range(len(img_metas))]
+
+        if pts_feats and self.with_pts_bbox:
+            bbox_pts = self.simple_test_pts(
+                pts_feats, img_metas, rescale=rescale)
+            for result_dict, pts_bbox in zip(bbox_list, bbox_pts):
+                result_dict['pts_bbox'] = pts_bbox
+        if img_feats and self.with_img_bbox:
+            bbox_img = self.simple_test_img(
+                img_feats, img_metas, rescale=rescale)
+            for result_dict, img_bbox in zip(bbox_list, bbox_img):
+                result_dict['img_bbox'] = img_bbox
+        
+        for i in range(len(bbox_list)):
+            bbox_list[i]['backbone'] = backbone[i].detach().cpu().numpy()
+        
+        return bbox_list
+
+    
+    def forward_test(self, points, img_metas, img=None, **kwargs):
+        for var, name in [(points, 'points'), (img_metas, 'img_metas')]:
+            if not isinstance(var, list):
+                raise TypeError('{} must be a list, but got {}'.format(
+                    name, type(var)))
+
+        num_augs = len(points)
+        if num_augs != len(img_metas):
+            raise ValueError(
+                'num of augmentations ({}) != num of image meta ({})'.format(
+                    len(points), len(img_metas)))
+
+        if num_augs == 1:
+            img = [img] if img is None else img
+            return self.simple_test(points[0], img_metas[0], img[0], **kwargs)
+        else:
+            return self.aug_test(points, img_metas, img, **kwargs)
 
     def forward_pts_train(self,
                           pts_feats,
@@ -194,3 +263,4 @@ class CenterPoint(MVXTwoStageDetector):
             pts_bbox = self.aug_test_pts(pts_feats, img_metas, rescale)
             bbox_list.update(pts_bbox=pts_bbox)
         return [bbox_list]
+

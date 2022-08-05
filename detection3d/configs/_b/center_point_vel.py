@@ -110,10 +110,10 @@ data = dict(
         type='SHtechDataset',
         data_root='/remote-home/share/SHTperson/',
         ann_file=
-        # '/remote-home/share/SHTperson/save_info/sht_infos_train19.pkl',
+        '/remote-home/share/SHTperson/save_info/sht_infos_train19.pkl',
         # '/remote-home/share/SHTperson/save_info/sht_infos_val_2345678.pkl',
         # "/remote-home/share/SHTperson/save_info/sht_infos_test_2345678.pkl",
-        '/remote-home/linzhx/Projects/strefer/data/strefer_det_info.pkl',
+        # '/remote-home/linzhx/Projects/strefer/data/strefer_det_info.pkl',
         pipeline=[
             dict(
                 type='LoadPointsFromMultiFrame',

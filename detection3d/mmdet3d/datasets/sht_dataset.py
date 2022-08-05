@@ -419,8 +419,24 @@ class SHtechDataset(Custom3DDataset):
                  pipeline=None):
         from tqdm import tqdm
         import os
-        GENERATE = True
-        if GENERATE:
+        GENERATE_BOX = False
+        GENERATE_BACKBONE = True
+        if GENERATE_BACKBONE:
+            base_path = "../data/backbone"
+            if not os.path.exists(base_path):
+                os.makedirs(base_path)
+            for i in tqdm(range(len(results))):
+                backbone = results[i]['backbone']
+                info = self.data_infos[i]
+                pts_filename = info['point_cloud']['point_cloud_path']
+                date, scene_id, _, pts_name = pts_filename.split('/')[-4:]
+                scene_path = os.path.join(base_path, date, scene_id)
+                if not os.path.exists(scene_path):
+                    os.makedirs(scene_path)
+                file_path = os.path.join(scene_path, f"{pts_name[:-4]}.npy")
+                np.save(file_path, backbone)
+        
+        if GENERATE_BOX:
             base_path = "../data/pred_bboxes"
             if not os.path.exists(base_path):
                 os.makedirs(base_path)
@@ -458,7 +474,7 @@ class SHtechDataset(Custom3DDataset):
                 else:
                     filter_pred_bboxes = np.zeros((0, 9), dtype=np.float32)
                 np.save(file_path, filter_pred_bboxes)
-            exit()
+        exit()
 
         detection_results = []
         tp = np.zeros(2, dtype=int)

@@ -105,7 +105,7 @@ class ViLBert3D(nn.Module):
 
         self.use_center = args.use_center
         if self.use_center:
-            self.pos_emb = nn.Linear(6, args.vis_out_dim)
+            self.pos_emb = nn.Linear(3 * args.frame_num, args.vis_out_dim)
 
         if args.load_from:
             print(f"Load Model from '{args.load_from}'")

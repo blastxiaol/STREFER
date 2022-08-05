@@ -70,8 +70,8 @@ def get_args_parser():
     args = parser.parse_args()
     if args.debug:
         args.work_dir = "debug"
-        args.num_workers = 0
-        args.batch_size = 2
+        # args.num_workers = 0
+        # args.batch_size = 16
     return args
 
 
