@@ -1,0 +1,1 @@
+python tools/train.py --use_view --frame_num 2 --use_bev --work_dir work_dir/bev/view

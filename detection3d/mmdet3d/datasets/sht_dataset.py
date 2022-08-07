@@ -323,12 +323,12 @@ class SHtechDataset(Custom3DDataset):
         info = self.data_infos[index]
         sample_idx = info['image']['image_idx']
         img_filename = info['image']['image_path']
-        # pts_filename = info['point_cloud']['point_cloud_path'].replace('/bin_v1','/bin_painting_seg_feature')
-        # pts_prev_filename = info['annos']['tracking']['prev_name'].replace('/pcd','/bin_painting_seg_feature')
-        # pts_next_filename = info['annos']['tracking']['next_name'].replace('/pcd','/bin_painting_seg_feature')
-        pts_filename = info['point_cloud']['point_cloud_path']
-        pts_prev_filename = info['annos']['tracking']['prev_name'].replace('/pcd','/bin_v1')
-        pts_next_filename = info['annos']['tracking']['next_name'].replace('/pcd','/bin_v1')
+        pts_filename = info['point_cloud']['point_cloud_path'].replace('/bin_v1','/bin_painting_seg_feature')
+        pts_prev_filename = info['annos']['tracking']['prev_name'].replace('/pcd','/bin_painting_seg_feature')
+        pts_next_filename = info['annos']['tracking']['next_name'].replace('/pcd','/bin_painting_seg_feature')
+        # pts_filename = info['point_cloud']['point_cloud_path']
+        # pts_prev_filename = info['annos']['tracking']['prev_name'].replace('/pcd','/bin_v1')
+        # pts_next_filename = info['annos']['tracking']['next_name'].replace('/pcd','/bin_v1')
     
         # print("the wrong file",pts_filename)
         input_dict = dict(
@@ -420,7 +420,7 @@ class SHtechDataset(Custom3DDataset):
         from tqdm import tqdm
         import os
         GENERATE_BOX = False
-        GENERATE_BACKBONE = True
+        GENERATE_BACKBONE = False
         if GENERATE_BACKBONE:
             base_path = "../data/backbone"
             if not os.path.exists(base_path):
@@ -474,7 +474,9 @@ class SHtechDataset(Custom3DDataset):
                 else:
                     filter_pred_bboxes = np.zeros((0, 9), dtype=np.float32)
                 np.save(file_path, filter_pred_bboxes)
-        exit()
+        
+        if GENERATE_BACKBONE or GENERATE_BOX:
+            exit()
 
         detection_results = []
         tp = np.zeros(2, dtype=int)

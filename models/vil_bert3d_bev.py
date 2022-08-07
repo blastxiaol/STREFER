@@ -81,24 +81,21 @@ class PointcloudImageFusion(nn.Module):
     def __init__(self, args, image_out_dim):
         super().__init__()
         self.linear = nn.Sequential(
-                LinearBlock(args.vis_out_dim * 2, args.vis_out_dim, args.linear_layer_num, args.dropout),
+                LinearBlock(args.vis_out_dim * 2 + 256, args.vis_out_dim, args.linear_layer_num, args.dropout),
                 nn.LayerNorm(args.vis_out_dim)
             )
     
-    def forward(self, image_feature, point_cloud_feature):
-        visual_feature = torch.cat([image_feature, point_cloud_feature], dim=2)
+    def forward(self, image_feature, point_cloud_feature, bev_feature):
+        visual_feature = torch.cat([image_feature, point_cloud_feature, bev_feature], dim=2)
         visual_feature = self.linear(visual_feature)
         return visual_feature
 
-class ViLBert3D(nn.Module):
+class ViLBert3DBEV(nn.Module):
     def __init__(self, args):
         super().__init__()
-        self.no_img = args.no_img
-
         self.point_cloud_extractor = PointCloudExtactor(args)
-        if not self.no_img:
-            self.image_extractor = ImageExtractor(args)
-            self.fusion = PointcloudImageFusion(args, self.image_extractor.output_dim)
+        self.image_extractor = ImageExtractor(args)
+        self.fusion = PointcloudImageFusion(args, self.image_extractor.output_dim)
         spatial_dim = 8
         if args.use_view:
             spatial_dim = 7
@@ -106,27 +103,19 @@ class ViLBert3D(nn.Module):
             spatial_dim = 9
         self.matching = ViLBert(spatial_dim, args.vilbert_config_path, args.vil_pretrained_file)
 
-        self.use_center = args.use_center
-        if self.use_center:
-            self.pos_emb = nn.Linear(3 * args.frame_num, args.vis_out_dim)
-
         if args.load_from:
             print(f"Load Model from '{args.load_from}'")
             self.load_state_dict(torch.load(args.load_from), strict=False)
     
-    def forward(self, image, boxes2d, points, spatial, vis_mask, token, mask, segment_ids, obj_center, **kwargs):
+    def forward(self, image, boxes2d, points, spatial, vis_mask, token, mask, segment_ids, bev_feature, **kwargs):
         # extract point cloud feature
         point_cloud_feature = self.point_cloud_extractor(points)
-        if self.use_center:
-            obj_center = self.pos_emb(obj_center)
-            point_cloud_feature = point_cloud_feature + obj_center
-        if not self.no_img:
-            # extract image feature
-            image_feature = self.image_extractor(image, boxes2d)
-            # fusion
-            visual_feature = self.fusion(image_feature, point_cloud_feature)
-        else:
-            visual_feature = point_cloud_feature
+
+        # extract image feature
+        image_feature = self.image_extractor(image, boxes2d)
+
+        # fusion
+        visual_feature = self.fusion(image_feature, point_cloud_feature, bev_feature)
 
         # matching
         score = self.matching(token, visual_feature, spatial, segment_ids, mask, vis_mask)

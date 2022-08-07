@@ -53,6 +53,9 @@ def get_args_parser():
     parser.add_argument('--vil_pretrained_file', default='pretrained_model/multi_task_model.bin', type=str, help="ViLBert pretrained file path")
     parser.add_argument('--cat_spatial', action='store_true')
     parser.add_argument('--use_center', action='store_true')
+    parser.add_argument('--use_bev', action='store_true')
+    parser.add_argument('--no_img', action='store_true')
+
 
     parser.add_argument('--no_evaluate', action='store_true', help="If true, evaluate when training")
     parser.add_argument('--epoch', default=40, type=int)
@@ -70,8 +73,8 @@ def get_args_parser():
     args = parser.parse_args()
     if args.debug:
         args.work_dir = "debug"
-        # args.num_workers = 0
-        # args.batch_size = 16
+        args.num_workers = 0
+        args.batch_size = 1
     return args
 
 
@@ -103,7 +106,7 @@ def train_epoch(epoch: int, dataloader, model,\
             day = int(eta // (24 * 3600))
 
             info = f"TRN Epoch[{epoch+1}][{idx}|{len(dataloader)}]\tloss={round(loss.item(), 4)}\t"\
-                   f"lr={optimizer.param_groups[0]['lr']}\tbert_lr={optimizer.param_groups[3]['lr']}\t"\
+                   f"lr={optimizer.param_groups[0]['lr']}\tbert_lr={optimizer.param_groups[-1]['lr']}\t"\
                    f"ETA: {day} days {hour} hours {minute} mins {sec} secs"
             print(info)
             logger(info)
@@ -189,12 +192,18 @@ def main(args):
     logger = Logger(args.work_dir)
 
     print("Create optimizer")
-    param_list=[
-            {'params':model.point_cloud_extractor.parameters(),'lr':args.lr},
-            {'params':model.image_extractor.parameters(),'lr':args.lr},
-            {'params':model.fusion.parameters(),'lr':args.lr},
-            {'params':model.matching.parameters(), 'lr':args.lr_bert},
-        ]
+    if not args.no_img:
+        param_list=[
+                {'params':model.point_cloud_extractor.parameters(),'lr':args.lr},
+                {'params':model.image_extractor.parameters(),'lr':args.lr},
+                {'params':model.fusion.parameters(),'lr':args.lr},
+                {'params':model.matching.parameters(), 'lr':args.lr_bert},
+            ]
+    else:
+        param_list=[
+                {'params':model.point_cloud_extractor.parameters(),'lr':args.lr},
+                {'params':model.matching.parameters(), 'lr':args.lr_bert},
+            ]
     optimizer = torch.optim.AdamW(param_list, lr=args.lr)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [30], gamma=0.1)
     criterion = torch.nn.BCEWithLogitsLoss()

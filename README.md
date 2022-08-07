@@ -9,12 +9,13 @@
    2. [x] ~~多帧输入三组实验 (但是效果不如单帧输入)~~
    3. [x] ~~匹配GT-pred-box~~
    4. [x] ~~多帧GT实验：点云融合，norm各自帧位置~~
-   5. [ ] 多帧实验：特征融合，norm各自帧位置
-   6. [ ] 三帧以上实验
+   5. [x] ~~多帧实验：特征融合，norm各自帧位置~~
+   6. [x] ~~三帧以上实验 3~~ 5 7
+   7. [ ] 多帧特征 + Image特征 + BEV特征
 3. 3. [x] ~~增加3DJCG对比实验~~
-4. 4. [ ] 3DVG-Transformer 对比实验
+4. 4. [x] ~~3DVG-Transformer 对比实验~~
 5. 5. [x] AAAI格式
-6. 6. [ ] 增加velocity误差
+6. 6. [x] 增加velocity误差
 7. 7. [ ] 网络描述细化（参数更详细）
 8. 8. [ ] 表格命名修订（更细化、明显）
 9. 9. [ ] 细化数据集标注规则流程
@@ -47,9 +48,10 @@ d_{thr} \text{ is a hyper-paramenter meaning distance threshold which is set as 
 
 # Experiments
 ## Detection
-| P@0.25 | R@0.25 | P@0.5 | R@0.5 |
-|:------:|:------:|:-----:|:-----:|
-| 88.29 | 90.97| 77.45 | 79.81 |
+| Input  | P@0.25 | R@0.25 | P@0.5 | R@0.5 |
+|:------:|:------:|:------:|:-----:|:-----:|
+| 1 frame  | x | x| x | x |
+| 2 frames | 88.29 | 90.97 | 77.45 | 79.81 |
 
 ## Grounding
 ### Resnet34 & Pointnet++ (single frames input)
@@ -87,13 +89,29 @@ d_{thr} \text{ is a hyper-paramenter meaning distance threshold which is set as 
 | Ours view-emb     |   42.31  |  39.68  |  32.63  | 
 | Ours view-vel-emb |   x  |  x  |  x  | 
 
+### Multi frames Input Fusion w/o center （3 frames)
+|       Method      | Acc@0.25 | Acc@0.5 | mIOU  |
+|:-----------------:|:--------:|:-------:|:-----:|
+| Ours pos-emb      |   x  |  x  | x | 
+| Ours view-emb     |   44.65  |  41.56  | 34.10 | 
+| Ours view-vel-emb |   x  |  x  |  x  | 
 
+
+### Multi frames Comparison (view-based)
+
+|       # Frames    | Acc@0.25 | Acc@0.5 | mIOU  |
+|:-----------------:|:--------:|:-------:|:-----:|
+| 1                 |   44.93  |  42.03  | 34.53 | 
+| 2                 |   45.87  |  42.40  | 34.93 | 
+| 3                 |   44.65  |  41.56  | 34.10 | 
+| 5                 |   45.59  |  42.21  | 34.81 | 
+| 7                 |   43.53  |  40.71  | 33.51 | 
 
 
 # Comparison Experiment
 | Method | Acc@0.25 | Acc@0.5 | mIOU |
 |:------:|:--------:|:-------:|:----:|
-| ScanRefer | x | x | x |
+| ScanRefer | 13.88 | 8.07 | 7.69 |
 | Referit3d | x | x | x |
 | InstanceRefer | 39.40 | 24.02 | 22.12 |
 | 3DVG-Transformer | 16.60 | 15.51 | 10.55 |

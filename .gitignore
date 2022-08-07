@@ -16,8 +16,11 @@ external_tools/pointnet2/dist
 external_tools/pointnet2/pointnet2.egg-info
 
 # data
+data
 data/pred_bboxes
 data/backbone
+data/statistic
+data/cal_l1.py
 
 
 # debug

@@ -1,5 +1,6 @@
 import os
 import torch
+from torchvision.ops import RoIAlign
 import numpy as np
 from torch.utils.data import Dataset
 import json
@@ -13,7 +14,7 @@ import cmath
 import pickle
 from utils import Scene
 
-class STREFER_MF(Dataset):
+class STREFER_BEV(Dataset):
     def __init__(self, args, split):
         super().__init__()
         self.split = split
@@ -59,7 +60,8 @@ class STREFER_MF(Dataset):
         else:
             self.current2prev = pickle.load(open("data/current2prev_mf.pkl", 'rb'))
         
-        self.no_img = args.no_img
+        self.bev_path = "data/backbone"
+        self.roi_align = RoIAlign(args.roi_size, spatial_scale=1.0, sampling_ratio=-1)
 
     def __getitem__(self, index):
         data = self.dataset[index]
@@ -97,13 +99,10 @@ class STREFER_MF(Dataset):
         
         # previous box concatation
         objects_pc_list = []
-        obj_center_list = []
         boxes3d = np.load(f"data/pred_bboxes/{group_id}/{scene_id}/{point_cloud_name[:-4]}.npy")
         objects_pc = strefer_utils.batch_extract_pc_in_box3d(points, boxes3d, self.sample_points_num, self.dim)
         corners2d = strefer_utils.batch_compute_box_3d(boxes3d)
-        obj_center = strefer_utils.norm(boxes3d[:,:3], np.array((self.xmin, self.ymin, self.zmin)), np.array((self.xmax, self.ymax, self.zmax)))
         objects_pc_list.append(objects_pc)
-        obj_center_list.append(obj_center)
         
         min_array = []
         max_array = []
@@ -135,11 +134,9 @@ class STREFER_MF(Dataset):
                 break
             curr_boxes = curr_scene.boxes
             curr_object_pc = []
-            curr_center = []
             for i, box in enumerate(curr_boxes):
                 if box is None:
                     curr_obj_pc = objects_pc[i]
-                    curr_obj_center = boxes3d[i, :3]
                 else:
                     box = np.array([box])[:,:7]
                     curr_obj_pc = strefer_utils.batch_extract_pc_in_box3d(points, box, self.sample_points_num, self.dim)[0]
@@ -152,23 +149,16 @@ class STREFER_MF(Dataset):
                             curr_obj_pc[:, :3] = np.zeros_like(curr_obj_pc[:, :3])
                         else:
                             curr_obj_pc[:, :3] = strefer_utils.norm(curr_obj_pc[:, :3], pmin, pmax)
-                    curr_obj_center = np.array(box)[0, :3]
                 curr_object_pc.append(curr_obj_pc)
-                curr_center.append(curr_obj_center)
             curr_object_pc = np.stack(curr_object_pc, axis=0)
-            curr_center = np.stack(curr_center, axis=0)
-            curr_center = strefer_utils.norm(curr_center, np.array((self.xmin, self.ymin, self.zmin)), np.array((self.xmax, self.ymax, self.zmax)))
             objects_pc_list.append(curr_object_pc)
-            obj_center_list.append(curr_center)
 
             curr_frame_num += 1
         
         for _ in range(curr_frame_num, self.frame_num):
             objects_pc_list.append(objects_pc)
-            obj_center_list.append(obj_center)
         
         objects_pc = np.concatenate(objects_pc_list, axis=1)
-        obj_center = np.concatenate(obj_center_list, axis=1)
 
         if False:
             prev_boxes3d = self.current2prev[f"{group_id}/{scene_id}/{point_cloud_name[:-4]}"]
@@ -269,6 +259,23 @@ class STREFER_MF(Dataset):
             boxes2d.append([xmin, ymin, xmax, ymax])
         boxes2d = np.array(boxes2d)
 
+        # bev
+        bev_feature = torch.from_numpy(np.load(os.path.join(self.bev_path, group_id, scene_id, f"{point_cloud_name[:-4]}.npy"))).unsqueeze(0)
+        boxes3d_bev = []
+        for box in boxes3d:
+            x, y, z, l, w, h, r, _, _ = box
+            cor3d = strefer_utils.my_compute_box_3d((x, y, z), (l, w, h), r)
+            xmin, ymin, zmin = cor3d.min(axis=0)
+            xmax, ymax, zmax = cor3d.max(axis=0)
+            xmin = strefer_utils.norm(xmin, self.xmin, self.xmax) * 255
+            xmax = strefer_utils.norm(xmax, self.xmin, self.xmax) * 255
+            ymin = strefer_utils.norm(ymin, self.ymin, self.ymax) * 255
+            ymax = strefer_utils.norm(ymax, self.ymin, self.ymax) * 255
+            box = [xmin, ymin, xmax, ymax]
+            boxes3d_bev.append(box)
+        boxes3d_bev = torch.tensor(boxes3d_bev, dtype=torch.float32)
+        bev_obj_feat = self.roi_align(bev_feature, [boxes3d_bev]).mean(-1).mean(-1)
+
         # target
         target = np.zeros((len(boxes3d), ), dtype=np.float32)
         target_box = np.array(point_cloud_info['bbox'], dtype=np.float32)
@@ -280,7 +287,7 @@ class STREFER_MF(Dataset):
         sentence = language_info['description'].lower()
         sentence = "[CLS] " + sentence + " [SEP]"
         token = self.tokenizer.encode(sentence)
-        return image, boxes2d, objects_pc, spatial, token, target, obj_center
+        return image, boxes2d, objects_pc, spatial, token, target, bev_obj_feat
     
     def collate_fn(self, raw_batch):
         raw_batch = list(zip(*raw_batch))
@@ -339,20 +346,15 @@ class STREFER_MF(Dataset):
         for i, each_target in enumerate(target_list):
             target[i, :len(each_target)] = torch.tensor(each_target)
         
-        # obj_center
-        obj_center_list = raw_batch[6]
-        obj_center = torch.zeros(len(boxes2d_list), max_obj_num,  3 * self.frame_num, dtype=self.data_type)
-        for i, each_obj_center in enumerate(obj_center_list):
-            obj_center[i, :len(each_obj_center)] = torch.tensor(each_obj_center)
+        # bev_feat
+        bev_feat_list = raw_batch[6]
+        bev_feature = torch.zeros(len(boxes2d_list), max_obj_num,  256, dtype=self.data_type)
+        for i, each_feat in enumerate(bev_feat_list):
+            bev_feature[i, :len(each_feat)] = each_feat
 
-        if not self.no_img:
-            data = dict(image=image, boxes2d=boxes2d, points=points, spatial=spatial,
-                        vis_mask=vis_mask, token=token, mask=mask, segment_ids=segment_ids,
-                        target=target, obj_center=obj_center)
-        else:
-            data = dict(image=None, boxes2d=None, points=points, spatial=spatial,
-                        vis_mask=vis_mask, token=token, mask=mask, segment_ids=segment_ids,
-                        target=target, obj_center=obj_center)
+        data = dict(image=image, boxes2d=boxes2d, points=points, spatial=spatial,
+                    vis_mask=vis_mask, token=token, mask=mask, segment_ids=segment_ids,
+                    target=target, bev_feature=bev_feature)    
 
         return data
     
