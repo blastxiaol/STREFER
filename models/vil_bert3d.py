@@ -4,6 +4,8 @@ from torchvision.ops import RoIAlign
 from .backbone.pointnet import PointNetPP
 from .backbone.resnet import ResNet
 from .vision_language_bert.vil_bert import ViLBert
+from .vision_language_bert.vl_bert import VLBert
+from .vision_language_bert.uniter import UNITER
 
 class LinearBlock(nn.Module):
     def __init__(self, in_size, out_size, linear_layer_num, dropout=0.):
@@ -102,9 +104,39 @@ class ViLBert3D(nn.Module):
         spatial_dim = 8
         if args.use_view:
             spatial_dim = 7
+            
         if args.use_vel:
             spatial_dim = 9
-        self.matching = ViLBert(spatial_dim, args.vilbert_config_path, args.vil_pretrained_file)
+        
+        self.bert = args.vis_lang_bert
+        if args.vis_lang_bert == 'vil-bert':
+            self.bert = args.vis_lang_bert
+            self.matching = ViLBert(spatial_dim, args.vilbert_config_path, args.vil_pretrained_file)
+        elif args.vis_lang_bert == 'vl-bert':
+            self.matching = VLBert(args, config_path="configs/vl_bert_base.yaml", pretrained_file="pretrained_model/vl-bert-base.pth")
+            self.classifier = nn.Sequential(
+                nn.Linear(self.matching.config.hidden_size, 256),
+                nn.ReLU(),
+                nn.Linear(256, 1)
+            )
+        elif args.vis_lang_bert =='uniter':
+            self.matching = UNITER(args, config_file="configs/uniter-base.json", state_dict="pretrained_model/uniter-base.pth")
+            self.classifier =  nn.Sequential(
+                nn.Linear(self.matching.config.hidden_size, self.matching.config.hidden_size),
+                nn.GELU(),
+                nn.LayerNorm(self.matching.config.hidden_size, eps=1e-12),
+                nn.Linear(self.matching.config.hidden_size, 1)
+            )
+        elif args.vis_lang_bert =='no_lang':
+            self.matching = nn.Identity()
+            self.classifier = nn.Sequential(
+                nn.Linear(args.vis_out_dim, 256),
+                nn.ReLU(),
+                nn.Dropout(args.dropout),
+                nn.Linear(256, 1)
+            )
+        else:
+            raise NotImplementedError
 
         self.use_center = args.use_center
         if self.use_center:
@@ -129,5 +161,20 @@ class ViLBert3D(nn.Module):
             visual_feature = point_cloud_feature
 
         # matching
-        score = self.matching(token, visual_feature, spatial, segment_ids, mask, vis_mask)
-        return score
+        if self.bert == 'vil-bert':
+            score = self.matching(token, visual_feature, spatial, segment_ids, mask, vis_mask)
+            return score
+        elif self.bert == 'vl-bert':
+            vl_feat = self.matching(token, visual_feature, spatial, segment_ids, mask, vis_mask)
+            score = self.classifier(vl_feat).squeeze(-1)
+            score += (1 - vis_mask) * (-9999)
+            return score
+        elif self.bert == 'uniter':
+            vl_feat = self.matching(token, visual_feature, spatial, segment_ids, mask, vis_mask)
+            score = self.classifier(vl_feat).squeeze(-1)
+            score += (1 - vis_mask) * (-9999)
+            return score
+        elif self.bert =='no_lang':
+            score = self.classifier(visual_feature).squeeze(-1)
+            score += (1 - vis_mask) * (-9999)
+            return score

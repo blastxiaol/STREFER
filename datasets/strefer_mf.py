@@ -1,10 +1,11 @@
 import os
+from tokenize import group
 import torch
 import numpy as np
 from torch.utils.data import Dataset
 import json
 from utils import pc_utils, strefer_utils
-from utils.metrics import cal_accuracy
+from utils.metrics import cal_accuracy, cal_iou3d
 from pytorch_transformers.tokenization_bert import BertTokenizer
 import cv2
 from tqdm import tqdm
@@ -58,6 +59,7 @@ class STREFER_MF(Dataset):
             self.current2prev = pickle.load(open("data/current2prev_gt.pkl", 'rb'))
         else:
             self.current2prev = pickle.load(open("data/current2prev_mf.pkl", 'rb'))
+            # self.current2prev = pickle.load(open("data/current2prev.pkl", 'rb'))
         
         self.no_img = args.no_img
 
@@ -96,6 +98,7 @@ class STREFER_MF(Dataset):
             prev_points = np.fromfile(prev_point_cloud_path, dtype=np.float32).reshape(-1, self.dim)
         
         # previous box concatation
+
         objects_pc_list = []
         obj_center_list = []
         boxes3d = np.load(f"data/pred_bboxes/{group_id}/{scene_id}/{point_cloud_name[:-4]}.npy")
@@ -126,49 +129,49 @@ class STREFER_MF(Dataset):
                 max_array.append(None)
 
         prev_objects_pc = np.zeros_like(objects_pc)
+        if True:
+            curr_frame_num = 1
+            curr_scene = self.current2prev[f"{group_id}/{scene_id}/{point_cloud_name[:-4]}"]
+            while curr_frame_num < self.frame_num and curr_scene is not None:
+                curr_scene = curr_scene.prev_scene 
+                if curr_scene is None:
+                    break
+                curr_boxes = curr_scene.boxes
+                curr_object_pc = []
+                curr_center = []
+                for i, box in enumerate(curr_boxes):
+                    if box is None:
+                        curr_obj_pc = objects_pc[i]
+                        curr_obj_center = boxes3d[i, :3]
+                    else:
+                        box = np.array([box])[:,:7]
+                        curr_obj_pc = strefer_utils.batch_extract_pc_in_box3d(points, box, self.sample_points_num, self.dim)[0]
+                        if not (curr_obj_pc[:, :3] == 0).all():
+                            pxmin, pymin, pzmin = curr_obj_pc[:, :3].min(axis=0)
+                            pxmax, pymax, pzmax = curr_obj_pc[:, :3].max(axis=0)
+                            pmin = np.array([pxmin, pymin, pzmin])
+                            pmax = np.array([pxmax, pymax, pzmax])
+                            if (pmin == pmax).any():
+                                curr_obj_pc[:, :3] = np.zeros_like(curr_obj_pc[:, :3])
+                            else:
+                                curr_obj_pc[:, :3] = strefer_utils.norm(curr_obj_pc[:, :3], pmin, pmax)
+                        curr_obj_center = np.array(box)[0, :3]
+                    curr_object_pc.append(curr_obj_pc)
+                    curr_center.append(curr_obj_center)
+                curr_object_pc = np.stack(curr_object_pc, axis=0)
+                curr_center = np.stack(curr_center, axis=0)
+                curr_center = strefer_utils.norm(curr_center, np.array((self.xmin, self.ymin, self.zmin)), np.array((self.xmax, self.ymax, self.zmax)))
+                objects_pc_list.append(curr_object_pc)
+                obj_center_list.append(curr_center)
 
-        curr_frame_num = 1
-        curr_scene = self.current2prev[f"{group_id}/{scene_id}/{point_cloud_name[:-4]}"]
-        while curr_frame_num < self.frame_num and curr_scene is not None:
-            curr_scene = curr_scene.prev_scene 
-            if curr_scene is None:
-                break
-            curr_boxes = curr_scene.boxes
-            curr_object_pc = []
-            curr_center = []
-            for i, box in enumerate(curr_boxes):
-                if box is None:
-                    curr_obj_pc = objects_pc[i]
-                    curr_obj_center = boxes3d[i, :3]
-                else:
-                    box = np.array([box])[:,:7]
-                    curr_obj_pc = strefer_utils.batch_extract_pc_in_box3d(points, box, self.sample_points_num, self.dim)[0]
-                    if not (curr_obj_pc[:, :3] == 0).all():
-                        pxmin, pymin, pzmin = curr_obj_pc[:, :3].min(axis=0)
-                        pxmax, pymax, pzmax = curr_obj_pc[:, :3].max(axis=0)
-                        pmin = np.array([pxmin, pymin, pzmin])
-                        pmax = np.array([pxmax, pymax, pzmax])
-                        if (pmin == pmax).any():
-                            curr_obj_pc[:, :3] = np.zeros_like(curr_obj_pc[:, :3])
-                        else:
-                            curr_obj_pc[:, :3] = strefer_utils.norm(curr_obj_pc[:, :3], pmin, pmax)
-                    curr_obj_center = np.array(box)[0, :3]
-                curr_object_pc.append(curr_obj_pc)
-                curr_center.append(curr_obj_center)
-            curr_object_pc = np.stack(curr_object_pc, axis=0)
-            curr_center = np.stack(curr_center, axis=0)
-            curr_center = strefer_utils.norm(curr_center, np.array((self.xmin, self.ymin, self.zmin)), np.array((self.xmax, self.ymax, self.zmax)))
-            objects_pc_list.append(curr_object_pc)
-            obj_center_list.append(curr_center)
-
-            curr_frame_num += 1
-        
-        for _ in range(curr_frame_num, self.frame_num):
-            objects_pc_list.append(objects_pc)
-            obj_center_list.append(obj_center)
-        
-        objects_pc = np.concatenate(objects_pc_list, axis=1)
-        obj_center = np.concatenate(obj_center_list, axis=1)
+                curr_frame_num += 1
+            
+            for _ in range(curr_frame_num, self.frame_num):
+                objects_pc_list.append(objects_pc)
+                obj_center_list.append(obj_center)
+            
+            objects_pc = np.concatenate(objects_pc_list, axis=1)
+            obj_center = np.concatenate(obj_center_list, axis=1)
 
         if False:
             prev_boxes3d = self.current2prev[f"{group_id}/{scene_id}/{point_cloud_name[:-4]}"]
@@ -349,6 +352,7 @@ class STREFER_MF(Dataset):
             data = dict(image=image, boxes2d=boxes2d, points=points, spatial=spatial,
                         vis_mask=vis_mask, token=token, mask=mask, segment_ids=segment_ids,
                         target=target, obj_center=obj_center)
+
         else:
             data = dict(image=None, boxes2d=None, points=points, spatial=spatial,
                         vis_mask=vis_mask, token=token, mask=mask, segment_ids=segment_ids,
@@ -359,7 +363,8 @@ class STREFER_MF(Dataset):
     def __len__(self):
         return len(self.dataset)
     
-    def evaluate(self, index_list):
+    def evaluate(self, index_list, result_name=''):
+        eval_results = []
         target_boxes = []
         pred_boxes = []
         idx = 0
@@ -374,7 +379,22 @@ class STREFER_MF(Dataset):
             boxes3d = np.load(f"data/pred_bboxes/{group_id}/{scene_id}/{point_cloud_name[:-4]}.npy")
             pred_box = boxes3d[max_index]
             target = point_cloud_info['bbox']
-            
+
+            if result_name:
+                language = data['language']['description']
+                point_cloud_path = os.path.join(self.base_path, group_id, scene_id, 'bin_v1', f"{point_cloud_name[:-4]}.bin")
+                img_name = os.path.join(self.base_path, group_id, scene_id, 'left', data['image']['image_name'])
+                out_data = dict()
+                out_data['gt_box'] = target
+                out_data['pred_box'] = pred_box
+                out_data["point_cloud_path"] = point_cloud_path
+                out_data["image_path"] = img_name
+                out_data['gt_corner2d'] = strefer_utils.batch_compute_box_3d([np.array(target)])
+                out_data['pred_corner2d'] = strefer_utils.batch_compute_box_3d([np.array(pred_box)])
+                out_data['language'] = language
+                out_data['iou'] = cal_iou3d(pred_box, target)
+                eval_results.append(out_data)
+
             pred_boxes.append(pred_box)
             target_boxes.append(target)
             idx += 1
@@ -382,60 +402,14 @@ class STREFER_MF(Dataset):
         target_boxes = np.array(target_boxes)
         pred_boxes = np.array(pred_boxes)
 
+        if result_name:
+            save_pkl(eval_results, result_name)
+
         acc25, acc50, miou = cal_accuracy(pred_boxes, target_boxes)
         return acc25, acc50, miou
 
-    def visualize(self, args, index_list):
-        import matplotlib.pyplot as plt
-        base_path = args.vis_path
-
-        if not os.path.exists(base_path):
-            os.makedirs(base_path)
-
-        idx = 0
-        for max_index in tqdm(index_list):
-            data = self.dataset[idx]
-            boxes3d = np.load(f"detection_results/scannet/{data['scene_id']}/pcd_{data['object_id']}_{data['image_id']}.npy")
-            bias = np.array(data['bias'])
-            boxes3d[:, :3] += bias
-
-            pred_box = boxes3d[max_index]
-            target = np.array(data['object_box'])
-            target[:3] += bias
-
-            axis_align_matrix_path = f"/remote-home/share/ScannetForScanrefer/scans/{data['scene_id']}/{data['scene_id']}.txt"
-            axis_align_matrix = strefer_utils.load_axis_align_matrix(axis_align_matrix_path)
-            cam_pose_filename   = f"/remote-home/share/ScannetForScanrefer/scans/{data['scene_id']}/pose/{data['image_id']}.txt"
-            cam_pose = np.loadtxt(cam_pose_filename)
-            color_intrinsic_path = f"/remote-home/share/ScannetForScanrefer/scans/{data['scene_id']}/intrinsic/intrinsic_color.txt"
-            color_intrinsic = np.loadtxt(color_intrinsic_path)
-
-            target_corners_2d, _ = strefer_utils.box3d_to_2d(target, axis_align_matrix, cam_pose, color_intrinsic)
-            pred_corners_2d, _ = strefer_utils.box3d_to_2d(pred_box, axis_align_matrix, cam_pose, color_intrinsic)
-
-            image_path = data['image_path']
-            img = cv2.imread(image_path)
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-            img = strefer_utils.draw_projected_box3d(img, target_corners_2d, (255, 0, 0), thickness=2)
-            img = strefer_utils.draw_projected_box3d(img, pred_corners_2d, (0, 255, 0), thickness=2)
-
-            filepath = os.path.join(base_path, f"{idx}.jpg")
-            # fig = plt.figure(figsize=())
-            sentence = data['sentence']
-            sentence = sentence.split()
-            if len(sentence) > 8:
-                sentence.insert(8, '\n')
-            if len(sentence) > 16:
-                sentence.insert(16, '\n')
-            sentence = ' '.join(sentence)
-            plt.imshow(img)
-            plt.axis('off')
-            plt.title(f"{sentence}")
-            plt.savefig(filepath, bbox_inches='tight')
-
-            plt.clf()
-            plt.close()
-
-            idx += 1
-        return
+def save_pkl(file, output_path):
+    import pickle
+    output = open(output_path, 'wb')
+    pickle.dump(file, output)
+    output.close()

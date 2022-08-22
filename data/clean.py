@@ -426,28 +426,14 @@ if __name__ == '__main__':
     trans_type(all_anno)
     print(len(TRAIN_SET), len(TEST_SET))
     if check(TRAIN_SET, TEST_SET):
-        print("OKKKKK")
-        with open("train_SHTpersonRefer_ann.json", 'w') as f:       # , encoding='UTF-8'
+        print("Generate Successfully")
+        with open("train_SHTpersonRefer_ann.json", 'w') as f:
             f.write(json.dumps(TRAIN_SET, cls=NumpyEncoder))
-        with open("test_SHTpersonRefer_ann.json", 'w') as f:        # , encoding='UTF-8'
+        with open("test_SHTpersonRefer_ann.json", 'w') as f:
             f.write(json.dumps(TEST_SET, cls=NumpyEncoder))
+    else:
+        assert False, "Failed. Re-split."
 
-    # output_path = fn_list[i]
-    # save_pkl(file, output_path)
-    # print(f"{fn_list[i]} End")
-
-    # save_pkl(file, "pkl_file/SHTpersonRefer_ann.pkl")
-    # print(max(ANN_SET.values()), min(ANN_SET.values()))
-
-
-    # print(len(PROBLEM_OBJECT_DATA))
-    # with open("有问题的数据/问题数据.json", 'w', encoding='UTF-8') as f:
-    #     f.write(json.dumps(PROBLEM_OBJECT_DATA))
-
-    # print(PROBLEM_OBJECT_DATA[0])
-    # print()
-    # print()
-    # print(PROBLEM_OBJECT_DATA[20])
 
     
     

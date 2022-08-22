@@ -1,1 +1,0 @@
-python tools/train.py --multi_frame --feature_fusion --work_dir work_dir/feature_fusion/xyz 

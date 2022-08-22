@@ -1,1 +1,0 @@
-python tools/train.py --multi_frame --work_dir work_dir/input_pfm/xyz/norm 

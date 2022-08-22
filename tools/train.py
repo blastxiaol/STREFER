@@ -39,7 +39,8 @@ def get_args_parser():
 
     parser.add_argument('--batch_size', default=16, type=int)
     parser.add_argument('--num_workers', default=8, type=int)
-
+    
+    parser.add_argument('--vis_lang_bert', default='vil-bert', type=str, help="Vision-Language Matching Module")
     parser.add_argument('--no_pretrained_resnet', action='store_true', help="If true, not use pretrained resnet")
     parser.add_argument('--resnet_layer_num', default=34, type=int, help="number of rest layers")
     parser.add_argument('--roi_size', default=(7, 7), type=tuple, help="roi align output size")
@@ -61,6 +62,7 @@ def get_args_parser():
     parser.add_argument('--epoch', default=40, type=int)
     parser.add_argument('--lr', default=1e-4, type=float)
     parser.add_argument('--lr_bert', default=1e-5, type=float)
+    parser.add_argument('--lr_step', default=[30], type=list)
 
     parser.add_argument('--use_gt', action='store_true', help="Use GT previous box (Test)")
     parser.add_argument('--relative_spatial', action='store_true', help="Use current box to norm")
@@ -73,8 +75,8 @@ def get_args_parser():
     args = parser.parse_args()
     if args.debug:
         args.work_dir = "debug"
-        args.num_workers = 0
-        args.batch_size = 1
+        # args.num_workers = 0
+        # args.batch_size = 1
     return args
 
 
@@ -127,7 +129,7 @@ def validate(dataset, dataloader, model, criterion=None):
         logits = model(**data)
         if criterion:
             each_loss = criterion(logits, data['target'])
-            loss += (each_loss * logits.shape[0]).item()
+            loss += (each_loss * logits.size(0)).item()
         index = torch.flatten(torch.topk(logits, 1).indices).cpu().detach().numpy()
         max_index.append(index)
     max_index = np.hstack(max_index)
@@ -193,19 +195,28 @@ def main(args):
 
     print("Create optimizer")
     if not args.no_img:
-        param_list=[
-                {'params':model.point_cloud_extractor.parameters(),'lr':args.lr},
-                {'params':model.image_extractor.parameters(),'lr':args.lr},
-                {'params':model.fusion.parameters(),'lr':args.lr},
-                {'params':model.matching.parameters(), 'lr':args.lr_bert},
-            ]
+        if args.vis_lang_bert == 'vil-bert':
+            param_list = [
+                    {'params':model.point_cloud_extractor.parameters(),'lr':args.lr},
+                    {'params':model.image_extractor.parameters(),'lr':args.lr},
+                    {'params':model.fusion.parameters(),'lr':args.lr},
+                    {'params':model.matching.parameters(), 'lr':args.lr_bert},
+                ]
+        else:
+            param_list = [
+                    {'params':model.point_cloud_extractor.parameters(),'lr':args.lr},
+                    {'params':model.image_extractor.parameters(),'lr':args.lr},
+                    {'params':model.fusion.parameters(),'lr':args.lr},
+                    {'params':model.classifier.parameters(),'lr':args.lr},
+                    {'params':model.matching.parameters(), 'lr':args.lr_bert},
+                ]
     else:
-        param_list=[
+        param_list = [
                 {'params':model.point_cloud_extractor.parameters(),'lr':args.lr},
                 {'params':model.matching.parameters(), 'lr':args.lr_bert},
             ]
     optimizer = torch.optim.AdamW(param_list, lr=args.lr)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [30], gamma=0.1)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, args.lr_step, gamma=0.1)
     criterion = torch.nn.BCEWithLogitsLoss()
 
     print("Run")

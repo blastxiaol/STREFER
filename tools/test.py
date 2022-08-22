@@ -9,23 +9,33 @@ import torch
 from datasets import create_dataset
 from models import create_model
 from torch.utils.data import DataLoader
-from time import time
-from utils import Logger
 from tqdm import tqdm
 
 def set_random_seed(seed):
-    torch.manual_seed(seed)
-    np.random.seed(seed)
     random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
 
 def get_args_parser():
-    parser = argparse.ArgumentParser('Set transformer detector')
-    parser.add_argument('--dataset', default='sunrefer_predet', type=str, help='sunrefer', choices=['sunrefer', 'sunrefer_predet', 'scanrefer'])
-    parser.add_argument('--data_path', default='data', type=str, help='point cloud path')
-    parser.add_argument('--max_seq_len', default=50, type=int)
-    parser.add_argument('--sample_points_num', default=3000, type=int, help='number of sampling points')
-    parser.add_argument('--img_shape', default=(256, 256), type=tuple, help='image shape')
+    parser = argparse.ArgumentParser('Set config')
+    parser.add_argument('--eval_path', type=str)
+    
+    parser.add_argument('--dataset', default='strefer', type=str, help='dataset')
+    parser.add_argument('--data_path', default='/remote-home/share/SHTperson', type=str, help='point cloud path')
+    parser.add_argument('--sample_points_num', default=500, type=int, help='number of sampling points')
+    parser.add_argument('--img_shape', default=(1280, 720), type=tuple, help='image shape')
     parser.add_argument('--bert_model', default='bert-base-uncased', type=str, help='bert model')
+    parser.add_argument('--use_view', action='store_true')
+    parser.add_argument('--use_vel', action='store_true')
+    parser.add_argument('--no_rgb', action='store_true', help="Not use pointpainting feature")
+    parser.add_argument('--multi_frame', action='store_true')
+    parser.add_argument('--threshold', default=0.25, type=float, help='target threshold')
+    parser.add_argument('--rel_dist_threshold', default=1.0, type=float, help='relative distance threshold for multi-objects association')
+    parser.add_argument('--matching_threshold', default=0.7, type=float, help='similarity matching threshold for multi-objects association')
+    parser.add_argument('--feature_fusion', action='store_true', help="Use feature level fusion")
+    parser.add_argument('--frame_num', default=1, type=int, help='frame_num')
 
     parser.add_argument('--batch_size', default=16, type=int)
     parser.add_argument('--num_workers', default=8, type=int)
@@ -39,56 +49,57 @@ def get_args_parser():
     parser.add_argument('--linear_layer_num', default=3, type=int, help="number of linear layers")
     parser.add_argument('--pc_out_dim', default=512, type=int, help="point cloud output feature dimension")
     parser.add_argument('--vis_out_dim', default=2048, type=int, help="visual information (point cloud and image) output feature dimension")
-    parser.add_argument('--spatial_dim', default=6, type=int, help="spatial dimension size")
     parser.add_argument('--vilbert_config_path', default='configs/bert_base_6layer_6conect.json', type=str, help="ViLBert config file path")
     parser.add_argument('--vil_pretrained_file', default='pretrained_model/multi_task_model.bin', type=str, help="ViLBert pretrained file path")
-    
-    parser.add_argument('--no_evaluate', action='store_true', help="If true, evaluate when training")
-    parser.add_argument('--epoch', default=100, type=int)
-    parser.add_argument('--lr', default=1e-4, type=float)
-    parser.add_argument('--lr_bert', default=1e-5, type=float)
+    parser.add_argument('--cat_spatial', action='store_true')
+    parser.add_argument('--use_center', action='store_true')
+    parser.add_argument('--use_bev', action='store_true')
+    parser.add_argument('--no_img', action='store_true')
 
+    parser.add_argument('--use_gt', action='store_true', help="Use GT previous box (Test)")
+    parser.add_argument('--relative_spatial', action='store_true', help="Use current box to norm")
     parser.add_argument('--seed', default=42, type=int)
-    parser.add_argument('--val_epoch', default=10, type=int)
-    parser.add_argument('--no_verbose', action='store_true', help="If true, not print information")
-    parser.add_argument('--work_dir', default='work_dir/vil_bert3d', type=str)
-
-    parser.add_argument('--eval_path', default='work_dir/vil_bert3d_dist/sunrefer/7-20-6-59-50/epoch_55_model.pth', type=str)
-    parser.add_argument('--no_vis', action='store_true', help="no visualization")
-    parser.add_argument('--vis_path', default='visualize/vilbert3d/sunrefer', type=str)
+    parser.add_argument('--load_from', default='', type=str, help="ViLBert pretrained file path")
+    parser.add_argument('--result_name', default='compare/PF.pkl', type=str)
+    
+    parser.add_argument('--debug', action='store_true')
+    
     args = parser.parse_args()
+    if args.debug:
+        args.work_dir = "debug"
+        args.num_workers = 0
+        args.batch_size = 1
     return args
 
 
 @torch.no_grad()
-def test(args, dataset, dataloader, model):
+def test(args, dataset, dataloader, model, criterion=None):
     model.eval()
+    loss = 0
     max_index = []
-    for image, boxes2d, points, spatial, vis_mask, token, mask, segment_ids, target in tqdm(dataloader):
-        image = image.cuda()
-        boxes2d = boxes2d.cuda()
-        points = points.cuda()
-        spatial = spatial.cuda()
-        vis_mask = vis_mask.cuda()
-        token = token.cuda()
-        mask = mask.cuda()
-        segment_ids = segment_ids.cuda()
-        target = target.cuda()
-        logits = model(image, boxes2d, points, spatial, vis_mask, token, mask, segment_ids)
+    for data in tqdm(dataloader):
+        for key in data:
+            try:
+                data[key] = data[key].cuda()
+            except:
+                pass
+        logits = model(**data)
+        if criterion:
+            each_loss = criterion(logits, data['target'])
+            loss += (each_loss * logits.shape[0]).item()
         index = torch.flatten(torch.topk(logits, 1).indices).cpu().detach().numpy()
         max_index.append(index)
     max_index = np.hstack(max_index)
-    acc25, acc50, m_iou = dataset.evaluate(max_index)
-    print(f"acc25={acc25}, acc50={acc50}, miou={m_iou}")
-    if not args.no_vis:
-        dataset.visualize(args, max_index)
+    acc25, acc50, m_iou = dataset.evaluate(max_index, args.result_name)
+    loss = loss / len(dataset)
+    return acc25, acc50, m_iou, loss
     
 
 def main(args):
     set_random_seed(args.seed)
 
     print("Create dataset")
-    dataset = create_dataset(args, 'val')
+    dataset = create_dataset(args, 'test')
     dataloader = DataLoader(dataset, args.batch_size, shuffle=False, num_workers=args.num_workers, collate_fn=dataset.collate_fn)
     
     print("Load Model")
@@ -96,7 +107,10 @@ def main(args):
     model.load_state_dict(torch.load(args.eval_path))
 
     print("Run")
-    test(args, dataset, dataloader, model)
+    acc25, acc50, m_iou, loss = test(args, dataset, dataloader, model)
+    print(f"acc25 = {acc25}")
+    print(f"acc50 = {acc50}")
+    print(f"miou = {m_iou}")
 
 if __name__ == '__main__':
     args = get_args_parser()

@@ -6,9 +6,12 @@
 *.ipynb
 **__pycache__**
 *.txt
+*.yaml
+*.pth
 data/src
 data/find_prev
 work_dir
+
 
 # pointnet++
 external_tools/pointnet2/build
@@ -22,6 +25,21 @@ data/backbone
 data/statistic
 data/cal_l1.py
 
+# models
+models/vision_language_bert/uniter
+models/vision_language_bert/vl_bert
 
 # debug
 debug
+
+# other
+record.md
+models/vil_bert3d_bev_2.py
+datasets/strefer_bev_2.py
+
+models/vil_bert3d_mf_2.py
+datasets/strefer_mf_2.py
+
+datasets/strefer_2.py
+
+scriptss

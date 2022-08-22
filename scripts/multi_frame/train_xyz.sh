@@ -1,1 +1,0 @@
-python tools/train.py --multi_frame --batch_size 8 --work_dir work_dir/multi_frame/xyz --cat_spatial

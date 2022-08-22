@@ -1,1 +1,0 @@
-python tools/train.py --work_dir work_dir/single_frame/xyz
